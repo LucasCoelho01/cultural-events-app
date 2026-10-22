@@ -1,0 +1,28 @@
+schema: spec-driven
+
+context: |
+  App web de eventos culturais (shows, teatro, exposições).
+  Monorepo: backend/ (Spring Boot), frontend/ (React), api/openapi.yaml, database/migrations/, postman/.
+  Back-end: Java 25, Spring Boot 4.1, Spring Data JPA, Validation, PostgreSQL 16, Maven wrapper.
+  Contract-first: api/openapi.yaml é escrito antes do código; openapi-generator (spring, interfaceOnly) gera interfaces e DTOs.
+  Schema: scripts SQL numerados em database/migrations (V001__nome.sql), nunca editados após o merge; sem Flyway; Hibernate ddl-auto=validate.
+  Ambiente local: Docker Compose com Postgres; testes de integração com Testcontainers; teste manual com Postman.
+  Contrato HTTP: OpenAPI 3 em /api/v1, erros no formato RFC 7807, paginação, datas ISO 8601 com fuso.
+  Front-end (fase 2): React + TypeScript (Vite), TanStack Query, React Router.
+  Ingestão (fase 3): agente Python externo grava direto no Postgres (role agent_writer, só DML, sem revisão humana); o schema é o contrato.
+  Escopo inicial: São Paulo; nenhuma regra pode presumir uma única cidade.
+  Idioma do domínio e das specs: português; código em inglês.
+  Desenvolvimento em Windows com PowerShell.
+
+rules:
+  proposal:
+    - Indicar quais capabilities são afetadas
+    - Indicar impacto no contrato de schema com o agente, se houver
+  specs:
+    - Todo requisito tem ao menos um cenário de erro
+    - Códigos HTTP e campos de erro explícitos nos cenários
+  design:
+    - Listar scripts SQL novos e mudanças no OpenAPI
+  tasks:
+    - Incluir tarefas de teste (unitário + integração com Testcontainers)
+    - Incluir a atualização do api/openapi.yaml antes da implementação, quando a API mudar
