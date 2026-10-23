@@ -96,7 +96,7 @@ Os scripts de migration em `database/migrations` SHALL seguir o padrão de nome 
 - **THEN** uma verificação automatizada do projeto identifica o arquivo como fora da convenção e falha
 
 ### Requirement: Configuração da aplicação via variáveis de ambiente
-`application.yml` SHALL configurar o datasource via variáveis de ambiente, definir `spring.jpa.hibernate.ddl-auto=validate`, `spring.jpa.open-in-view=false` e a propriedade `app.default-city=sp`, documentada como valor padrão apenas — nenhuma regra do sistema pode presumir uma única cidade.
+`application.yml` SHALL configurar o datasource via variáveis de ambiente, definir `spring.jpa.hibernate.ddl-auto=validate`, `spring.jpa.open-in-view=false` e a propriedade `app.default-city=sp/sao-paulo` (formato `uf/cidade`), documentada como valor padrão apenas — nenhuma regra do sistema pode presumir uma única cidade.
 
 #### Scenario: Contexto sobe com variáveis de ambiente configuradas
 - **WHEN** as variáveis de ambiente do datasource (host, porta, usuário, senha, banco) são fornecidas
@@ -107,11 +107,11 @@ Os scripts de migration em `database/migrations` SHALL seguir o padrão de nome 
 - **THEN** a aplicação falha ao iniciar devido à validação `ddl-auto=validate`, reportando a inconsistência
 
 ### Requirement: Organização de pacotes por capability e regra arquitetural
-O código do backend SHALL ser organizado por pacote de capability (`com.culturalevents.<capability>.{api,application,domain,infrastructure}`), mais um pacote `com.culturalevents.shared` para erros e paginação, e SHALL ser verificado por um teste ArchUnit automatizado garantindo a regra de dependência `api -> application -> domain <- infrastructure` (domain não depende de api, application ou infrastructure).
+O código do backend SHALL ser organizado por pacote de capability (`com.culturalevents.<capability>.{api,application,domain,infrastructure}`), mais um pacote `com.culturalevents.shared` para erros e paginação, e SHALL ser verificado por um teste ArchUnit automatizado garantindo, para qualquer capability presente ou futura que siga esse padrão de pacote, a regra de dependência `api -> application -> domain <- infrastructure` (domain não depende de api, application ou infrastructure).
 
-#### Scenario: Estrutura inicial da capability platform-foundation
-- **WHEN** a estrutura de pacotes do backend é inspecionada
-- **THEN** existem os pacotes da capability `platform-foundation` sob `com.culturalevents.platformfoundation` e o pacote `com.culturalevents.shared`
+#### Scenario: Convenção de pacotes verificável sem depender de uma capability concreta
+- **WHEN** nenhum pacote de capability de negócio existe ainda no backend
+- **THEN** o teste ArchUnit que verifica a regra de dependência continua passando (a regra não exige que nenhuma classe exista no padrão de pacote para ser válida)
 
 #### Scenario: Teste ArchUnit falha ao detectar violação de dependência
 - **WHEN** uma classe do pacote `domain` depende de uma classe dos pacotes `infrastructure`, `application` ou `api`
