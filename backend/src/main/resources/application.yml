@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cultural_events}
+    username: ${DB_USER:cultural_events}
+    password: ${DB_PASSWORD:cultural_events}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  mvc:
+    problemdetails:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+app:
+  default-city: sp/sao-paulo

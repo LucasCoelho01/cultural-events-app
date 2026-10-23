@@ -1,0 +1,93 @@
+openapi: 3.1.0
+info:
+  title: Cultural Events API
+  description: API do sistema de eventos culturais (shows, teatro, exposições).
+  version: "0.1.0"
+servers:
+  - url: /api/v1
+paths: {}
+components:
+  schemas:
+    Problem:
+      type: object
+      description: >-
+        Resposta de erro padronizada no formato RFC 7807 (application/problem+json).
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Identificador do tipo de problema.
+          example: about:blank
+        title:
+          type: string
+          description: Resumo curto e legível do tipo de problema.
+          example: Unprocessable Entity
+        status:
+          type: integer
+          format: int32
+          description: Código de status HTTP gerado pelo servidor de origem.
+          example: 422
+        detail:
+          type: string
+          description: Explicação legível específica desta ocorrência do problema.
+          example: A requisição contém campos inválidos.
+        instance:
+          type: string
+          format: uri
+          description: Identificador da ocorrência específica do problema.
+        errors:
+          type: array
+          description: Lista de erros por campo, presente quando status é 422.
+          items:
+            $ref: "#/components/schemas/FieldError"
+      required:
+        - title
+        - status
+    FieldError:
+      type: object
+      description: Erro de validação associado a um campo específico da requisição.
+      properties:
+        field:
+          type: string
+          description: Nome do campo que falhou na validação.
+          example: nome
+        message:
+          type: string
+          description: Mensagem explicando a violação de validação.
+          example: não pode estar em branco
+      required:
+        - field
+        - message
+    PageMetadata:
+      type: object
+      description: Metadados de paginação retornados em respostas de listagem.
+      properties:
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Número da página atual (baseado em zero).
+          example: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Quantidade máxima de itens por página.
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Quantidade total de itens disponíveis.
+          example: 123
+        totalPages:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Quantidade total de páginas disponíveis.
+          example: 7
+      required:
+        - page
+        - size
+        - totalElements
+        - totalPages
