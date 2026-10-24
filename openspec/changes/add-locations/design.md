@@ -37,7 +37,7 @@ Motivação e escopo: ver proposal.md.
 - Alternativa descartada: entidades JPA separadas do modelo de domínio (mapeamento duplo) — custo sem ganho para um catálogo somente leitura de 2 tabelas.
 
 **3. Mapeamento JPA compatível com `validate`**
-- `state.uf`/`city.state_uf` são `CHAR(2)` (bpchar): usar `@JdbcTypeCode(SqlTypes.CHAR)` + `@Column(length = 2)` para a validação passar; `id` com `GenerationType.IDENTITY`; `latitude`/`longitude` como `BigDecimal` com `precision = 9, scale = 6`. `City` referencia `State` por `@ManyToOne(fetch = LAZY)`; o DTO usa `state.uf` sem carregar o `State` (a coluna `state_uf` é lida via a associação/`@JoinColumn`).
+- `state.uf`/`city.state_uf` são `CHAR(2)` (bpchar): usar `@JdbcTypeCode(SqlTypes.CHAR)` + `@Column(length = 2)` para a validação passar; `id` com `GenerationType.IDENTITY`; `latitude`/`longitude` como `BigDecimal` com `precision = 9, scale = 6`. `City.stateUf` é uma coluna `String` simples (`@Column(name = "state_uf", length = 2)` + `@JdbcTypeCode(SqlTypes.CHAR)`), **sem** `@ManyToOne` para `State`: a integridade fica na FK do banco e o DTO usa `stateUf` direto, sem joins nem lazy loading.
 - `GET /states` e as consultas devolvem entidades somente leitura (sem setters públicos, `@Immutable`).
 
 **4. Normalização**: `uf` é persistida em maiúsculas (`SP`) e comparada em maiúsculas; `slug` em minúsculas. O valor `sp/sao-paulo` de `app.default-city` é normalizado ao resolver (`uf` → maiúsculas), sem mudar o formato já documentado. Listagem ordenada por `name, id` para paginação estável; `/states` ordenado por `name`.
@@ -51,6 +51,8 @@ Motivação e escopo: ver proposal.md.
 
 **7. Teste sem literal de cidade**
 - Os testes de integração usam o valor lido de `app.default-city` para a cidade da carga e inserem cidades próprias de fixture (nomes fictícios, ex.: `Cidade Teste`, UF real, IBGE fora da faixa real) para ativa/inativa/paginação. Teste de varredura (`NoHardcodedCityTest`) lê os `.java` de `src/main` e falha se achar nome, slug ou IBGE da cidade da carga; o `application.yml` e o SQL de seed são dados e ficam fora da varredura.
+
+**8a. Infraestrutura de teste compartilhada**: uma classe base abstrata `AbstractPostgresIntegrationTest` (em `com.culturalevents`, `src/test`) mantém um único `PostgreSQLContainer` estático (singleton, iniciado uma vez num bloco `static`, sem `@Container`/`@Testcontainers` para não ser parado por classe), exposto com `@ServiceConnection`, e aplica `database/migrations` uma única vez nesse mesmo bloco. Todas as classes de integração (incluindo `PlatformFoundationIntegrationTest`, migrada) a estendem; o Ryuk encerra o container ao fim da JVM. Dados de fixture inseridos por um teste são removidos ao final dele (`@AfterEach` ou `@Sql(executionPhase = AFTER_TEST_METHOD)`), de modo que nenhum teste dependa de ordem nem de dados deixados por outro. Alternativa descartada: um container por classe — lento e repete as migrations. Consequência: classes com `@TestPropertySource`/propriedades diferentes criam contextos Spring distintos, mas reusam o mesmo container.
 
 **8. Testes**: unitário do `LocationsService`/`DefaultCityResolver` (Mockito) e do mapper; integração com Testcontainers + MockMvc (`@SpringBootTest`, `@AutoConfigureMockMvc`, migrations aplicadas como no teste base) cobrindo cada endpoint e cada cenário de erro; testes de configuração da cidade padrão via `@TestPropertySource`/`DynamicPropertySource` por classe; ArchUnit existente passa a ter classes reais para validar.
 
