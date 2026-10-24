@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -57,6 +58,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHandlerMethodValidationException(
             HandlerMethodValidationException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<FieldError> bodyErrors = ex.getBeanResults().stream()
+                .filter(result -> result.getArgument() != null
+                        && result.getMethodParameter().hasParameterAnnotation(RequestBody.class))
+                .flatMap(result -> result.getFieldErrors().stream())
+                .map(fieldError -> new FieldError(
+                        fieldError.getField(),
+                        fieldError.getDefaultMessage() != null ? fieldError.getDefaultMessage() : "valor inválido"))
+                .collect(Collectors.toList());
+        if (!bodyErrors.isEmpty()) {
+            return unprocessableEntity(bodyErrors);
+        }
         return badRequest("Parâmetro de requisição inválido.");
     }
 

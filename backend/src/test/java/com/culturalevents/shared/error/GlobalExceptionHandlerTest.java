@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -105,6 +106,28 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void corpoInvalidoComValidacaoDeMetodoRetorna422ComErrosPorCampo() throws Exception {
+        mockMvc.perform(post("/test/items/AB")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"\"}"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.errors[0].field").value("name"))
+                .andExpect(jsonPath("$.errors[0].message").exists());
+    }
+
+    @Test
+    void pathVariableInvalidoComValidacaoDeMetodoRetorna400() throws Exception {
+        mockMvc.perform(post("/test/items/ABC")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"ok\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
     void erroInesperadoRetorna500SemStackTrace() throws Exception {
         mockMvc.perform(get("/test/boom"))
                 .andExpect(status().isInternalServerError())
@@ -136,6 +159,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/param")
         public void param(@RequestParam @Size(min = 2, max = 2) String uf) {
             // no-op; existe apenas para disparar a validação de parâmetro de query
+        }
+
+        @PostMapping("/items/{code}")
+        public void item(@PathVariable @Size(min = 2, max = 2) String code, @Valid @RequestBody TestRequest request) {
+            // no-op; path restrito + corpo validado ativam a validação de método do MVC
         }
 
         @GetMapping("/boom")
