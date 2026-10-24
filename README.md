@@ -72,6 +72,25 @@ Os testes de integração usam [Testcontainers](https://testcontainers.com/) e s
 próprio container Postgres automaticamente — não dependem do `docker compose up -d`
 acima, mas precisam do Docker Desktop em execução.
 
+## Localidades (estados e cidades)
+
+A API expõe, somente leitura, `GET /api/v1/states`, `GET /api/v1/cities`,
+`GET /api/v1/cities/{uf}/{slug}` e `GET /api/v1/cities/default`. Estados e cidades vivem nas
+tabelas `state` e `city`, criadas e populadas por `database/migrations/V002__create_locations.sql`
+(27 UFs e uma cidade inicial ativa).
+
+- **Cadastrar uma nova cidade:** não há endpoint de escrita. Crie um novo script numerado em
+  `database/migrations/` (por exemplo `V003__add_<cidade>.sql`) com um `INSERT INTO city (...)`;
+  cidades entram com `active = false` a menos que `active` seja informado. Nunca edite um
+  script já mergeado.
+- **Cidade padrão:** vem da propriedade `app.default-city` (formato `uf/slug`, por exemplo
+  `rj/rio-de-janeiro`), definida em `backend/src/main/resources/application.yml` e
+  sobrescrevível pela variável de ambiente `APP_DEFAULT_CITY`. Se apontar para uma cidade
+  inexistente, inativa ou em formato inválido, `GET /api/v1/cities/default` responde 500.
+- **Aplicar a V002 num banco local já existente:** o `initdb.d` só roda em volume novo, então
+  recrie o volume (`docker compose down -v` e `docker compose up -d`) ou execute o script
+  manualmente.
+
 ## Gerando código a partir do contrato OpenAPI
 
 `api/openapi.yaml` é a fonte da verdade do contrato HTTP. Qualquer alteração nele (novo

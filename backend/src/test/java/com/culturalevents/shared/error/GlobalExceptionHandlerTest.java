@@ -1,18 +1,24 @@
 package com.culturalevents.shared.error;
 
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
+import jakarta.validation.Validation;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.hamcrest.Matchers.not;
@@ -67,6 +73,61 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void parametroDeQueryInvalidoRetorna400() throws Exception {
+        mockMvc.perform(get("/test/param").param("uf", "SPP"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"));
+    }
+
+    @Test
+    void violacaoEmParametroDeMetodoRetorna400() throws Exception {
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        var method = TestController.class.getDeclaredMethod("param", String.class);
+        var violations = validator.forExecutables()
+                .validateParameters(new TestController(), method, new Object[] {"SPP"});
+
+        var response = new GlobalExceptionHandler()
+                .handleConstraintViolation(new ConstraintViolationException(violations));
+
+        org.assertj.core.api.Assertions.assertThat(response.getStatusCode().value()).isEqualTo(400);
+        org.assertj.core.api.Assertions.assertThat(((ProblemDetail) response.getBody()).getDetail()).contains("uf");
+    }
+
+    @Test
+    void violacaoEmBeanContinuaRetornando422() {
+        var validator = Validation.buildDefaultValidatorFactory().getValidator();
+        var violations = validator.validate(new TestRequest());
+
+        var response = new GlobalExceptionHandler()
+                .handleConstraintViolation(new ConstraintViolationException(violations));
+
+        org.assertj.core.api.Assertions.assertThat(response.getStatusCode().value()).isEqualTo(422);
+    }
+
+    @Test
+    void corpoInvalidoComValidacaoDeMetodoRetorna422ComErrosPorCampo() throws Exception {
+        mockMvc.perform(post("/test/items/AB")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"\"}"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.errors[0].field").value("name"))
+                .andExpect(jsonPath("$.errors[0].message").exists());
+    }
+
+    @Test
+    void pathVariableInvalidoComValidacaoDeMetodoRetorna400() throws Exception {
+        mockMvc.perform(post("/test/items/ABC")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"ok\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Bad Request"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
     void erroInesperadoRetorna500SemStackTrace() throws Exception {
         mockMvc.perform(get("/test/boom"))
                 .andExpect(status().isInternalServerError())
@@ -93,6 +154,16 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/conflict")
         public void conflict() {
             throw new ConflictException("conflito de estado");
+        }
+
+        @GetMapping("/param")
+        public void param(@RequestParam @Size(min = 2, max = 2) String uf) {
+            // no-op; existe apenas para disparar a validação de parâmetro de query
+        }
+
+        @PostMapping("/items/{code}")
+        public void item(@PathVariable @Size(min = 2, max = 2) String code, @Valid @RequestBody TestRequest request) {
+            // no-op; path restrito + corpo validado ativam a validação de método do MVC
         }
 
         @GetMapping("/boom")
