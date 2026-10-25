@@ -114,6 +114,32 @@ Dança, Cinema e Outros.
   Get-Content -Raw database/migrations/V003__create_categories.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
   ```
 
+## Locais (venues)
+
+A API expõe o CRUD de locais por cidade: `POST /api/v1/venues`, `GET /api/v1/venues`
+(`?city=uf/slug`, padrão `app.default-city`; `?neighborhood=`; `page`/`size`; ordenado por nome),
+`GET`, `PUT` (substituição completa) e `DELETE /api/v1/venues/{id}`. O `id` é o `public_id` (UUID);
+o `BIGSERIAL` interno nunca é exposto. A cidade (`cityId`, de `GET /api/v1/cities`) precisa existir
+e estar ativa. Slug repetido na mesma cidade responde 409.
+
+- **Regras no banco:** a tabela `venue` é criada por `database/migrations/V004__create_venues.sql`.
+  Um trigger gera o `slug` a partir do `name` quando vier nulo (ou vazio) e outro atualiza
+  `updated_at` a cada UPDATE. Valem para qualquer escritor, inclusive o agente de ingestão, que
+  pode omitir `slug`, `public_id` e as datas.
+- **Funções reutilizáveis:** `slugify(text)` (minúsculas, sem acentos, hífens) e `set_updated_at()`
+  (trigger genérico) podem ser usadas por outras tabelas, como `event`:
+
+  ```sql
+  CREATE TRIGGER event_set_updated_at BEFORE UPDATE ON event
+      FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  ```
+- **Aplicar a V004 num banco local já existente:** recrie o volume
+  (`docker compose down -v` e `docker compose up -d`) ou execute o script manualmente:
+
+  ```powershell
+  Get-Content -Raw database/migrations/V004__create_venues.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
+  ```
+
 ## Gerando código a partir do contrato OpenAPI
 
 `api/openapi.yaml` é a fonte da verdade do contrato HTTP. Qualquer alteração nele (novo

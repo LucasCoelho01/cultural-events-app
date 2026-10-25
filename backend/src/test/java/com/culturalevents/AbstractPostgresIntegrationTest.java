@@ -45,6 +45,9 @@ public abstract class AbstractPostgresIntegrationTest {
     /** Prefixo do slug das categorias de fixture, para distingui-las da carga inicial. */
     protected static final String FIXTURE_CATEGORY_PREFIX = "teste-";
 
+    /** Prefixo do slug dos locais de fixture, para distingui-los de dados reais. */
+    protected static final String FIXTURE_VENUE_PREFIX = "teste-";
+
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -74,6 +77,8 @@ public abstract class AbstractPostgresIntegrationTest {
 
     @AfterEach
     void removeFixtureCities() {
+        // Locais antes das cidades: venue.city_id referencia city (um só método garante a ordem).
+        jdbcTemplate.update("DELETE FROM venue WHERE slug LIKE ?", FIXTURE_VENUE_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM city WHERE ibge_code >= ?", FIXTURE_IBGE_BASE);
     }
 
@@ -105,5 +110,25 @@ public abstract class AbstractPostgresIntegrationTest {
                         + "VALUES ((SELECT id FROM category WHERE slug = ?), ?, ?, ?)",
                 parentSlug, name, fullSlug, sortOrder);
         return fullSlug;
+    }
+
+    /**
+     * Insere um local de fixture; o slug recebe o prefixo {@link #FIXTURE_VENUE_PREFIX}.
+     *
+     * @param cityId id da cidade (de {@code city.id})
+     * @return o slug completo do local inserido
+     */
+    protected String insertFixtureVenue(long cityId, String slug, String name, String neighborhood) {
+        String fullSlug = FIXTURE_VENUE_PREFIX + slug;
+        jdbcTemplate.update(
+                "INSERT INTO venue (city_id, name, slug, neighborhood) VALUES (?, ?, ?, ?)",
+                cityId, name, fullSlug, neighborhood);
+        return fullSlug;
+    }
+
+    /** Id de {@code city} pelo par UF e slug. */
+    protected long cityId(String uf, String slug) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM city WHERE state_uf = ? AND slug = ?", Long.class, uf, slug);
     }
 }

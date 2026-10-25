@@ -46,8 +46,8 @@
 - Alternativa descartada: porta `CityGateway` em `venues.domain` com adaptador em `venues.infrastructure` — ArchUnit proíbe `infrastructure -> locations.application`, e a porta só reembrulharia o mesmo caso de uso.
 
 **4. Camadas do pacote `venues`**
-- `domain`: entidade JPA mutável `Venue` (`@GeneratedValue(IDENTITY)` em `id`; `publicId` UUID com `@Generated(event = INSERT)`, `insertable = false`; `cityId` `Long`; `slug` com `@Generated(event = {INSERT, UPDATE})`; `createdAt`/`updatedAt` `OffsetDateTime`, `insertable = false, updatable = false`, `@Generated`), `VenueRepository` (`search(cityId, neighborhood, pageable)`, `findByPublicId`, `saveAndFlush`, `delete`). O conflito de slug é traduzido na `application` (ver abaixo), não no domínio.
-  - Como o banco gera `public_id`, `slug` nulo, `created_at` e `updated_at`, o Hibernate relê esses valores após INSERT/UPDATE com `@Generated`; `slug` não usa `nullable = false` na entidade para o Hibernate aceitar o nulo antes do trigger.
+- `domain`: entidade JPA mutável `Venue` (`@GeneratedValue(IDENTITY)` em `id`; `publicId` UUID com `@Generated(event = INSERT)`, `insertable = false`; `cityId` `Long`; `slug` coluna comum anulável; `createdAt`/`updatedAt` `OffsetDateTime`, `insertable = false, updatable = false`, `@Generated`), `VenueRepository` (`search(cityId, neighborhood, pageable)`, `findByPublicId`, `saveAndFlush`, `delete`). O conflito de slug é traduzido na `application` (ver abaixo), não no domínio.
+  - Como o banco gera `public_id`, `slug` nulo, `created_at` e `updated_at`, o adaptador chama `EntityManager.refresh` após `saveAndFlush` para refletir os valores gerados. `slug` não pode ser `@Generated` (o Hibernate deixaria de gravar o slug informado) nem usar `nullable = false` na entidade (o nulo precisa chegar ao trigger).
 - `application`: `VenuesService` (`@Transactional`, leitura `readOnly`) com `list(city, neighborhood, page, size)`, `get(id)`, `create(cmd)`, `replace(id, cmd)`, `delete(id)`; `VenueCommand` (record de entrada); `VenueValidationException(field, message)`.
   - `list`: `city` ausente → `defaultCityId()`; presente → parse `uf/slug` (formato inválido é 400 já pelo `pattern` do contrato) e `findIdByUfAndSlug`, `NotFoundException` se não existir. Cidade inativa **não** é rejeitada na listagem. `neighborhood` filtra por `lower(neighborhood) = lower(?)`. Ordenação `name, id` (o `id` desempata páginas).
   - `create`/`replace`: valida a cidade (`findById`; ausente ou inativa → `VenueValidationException("cityId", ...)`; em `replace` só se `cityId` mudou), grava com `saveAndFlush` e traduz `DataIntegrityViolationException` pelo SQLSTATE: `23505` na constraint `(city_id, slug)` → `ConflictException`; `23514` do trigger de slug → `VenueValidationException("name", "não gera um slug válido")`; `23503` → `VenueValidationException("cityId", ...)`.
@@ -70,7 +70,7 @@
 
 ## Risks / Trade-offs
 
-- [Reler colunas geradas via `@Generated` com `IDENTITY` pode falhar ou custar uma consulta extra] → `saveAndFlush` e testes de criação/substituição afirmam `slug`, `publicId` e `updatedAt` do retorno; fallback é um `refresh` explícito no adaptador.
+- [O `refresh` após gravar custa uma consulta extra por escrita] → aceito, o volume de escrita é baixo; testes de criação/substituição afirmam `slug`, `publicId` e `updatedAt` do retorno. O `refresh` exige transação (o serviço já é `@Transactional`).
 - [Slug gerado colide e o cliente recebe 409 sem sugestão] → aceito; o cliente reenvia com `slug` explícito (cenário coberto em spec).
 - [Remoção de cidade concorrente com criação de local] → FK no banco rejeita; cidades só mudam por script SQL, então a janela é desprezível.
 - [`DELETE` físico será barrado por FK quando `event` existir] → `add-events-crud` introduz o 409 explicitamente; nesta change não há dependentes.

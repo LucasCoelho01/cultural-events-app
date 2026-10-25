@@ -26,6 +26,11 @@ class CityRepositoryAdapter implements CityRepository {
     }
 
     @Override
+    public Optional<City> findById(Long id) {
+        return delegate.findById(id);
+    }
+
+    @Override
     public Optional<City> findByUfAndSlug(String uf, String slug) {
         return delegate.findByStateUfAndSlug(uf, slug);
     }

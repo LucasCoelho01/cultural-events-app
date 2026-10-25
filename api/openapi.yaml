@@ -173,10 +173,176 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /venues:
+    get:
+      tags: [venues]
+      operationId: listVenues
+      summary: Lista locais de uma cidade de forma paginada
+      description: >-
+        Retorna os locais da cidade informada em `city` (padrão: `app.default-city`), ordenados por nome.
+      parameters:
+        - name: city
+          in: query
+          required: false
+          description: Cidade no formato `uf/slug`; padrão é a cidade configurada em `app.default-city`.
+          schema:
+            type: string
+            pattern: "^[A-Za-z]{2}/[^/\\s]+$"
+            example: sp/sao-paulo
+        - name: neighborhood
+          in: query
+          required: false
+          description: Filtra pelo bairro (igualdade sem diferenciar maiúsculas).
+          schema:
+            type: string
+            maxLength: 120
+        - name: page
+          in: query
+          required: false
+          description: Número da página (baseado em zero).
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Quantidade de itens por página.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Página de locais.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VenuePage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Cidade do filtro não encontrada.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    post:
+      tags: [venues]
+      operationId: createVenue
+      summary: Cadastra um local
+      description: Cria o local; `slug` ausente é gerado a partir de `name`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueInput"
+      responses:
+        "201":
+          description: Local criado.
+          headers:
+            Location:
+              description: URL do local criado.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /venues/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador público (UUID) do local.
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [venues]
+      operationId: getVenue
+      summary: Busca um local por id
+      responses:
+        "200":
+          description: Local encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/VenueNotFound"
+    put:
+      tags: [venues]
+      operationId: replaceVenue
+      summary: Substitui todos os campos de um local
+      description: Campos opcionais ausentes passam a nulos; `slug` ausente é regenerado a partir de `name`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueInput"
+      responses:
+        "200":
+          description: Local atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/VenueNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      tags: [venues]
+      operationId: deleteVenue
+      summary: Remove um local
+      responses:
+        "204":
+          description: Local removido.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/VenueNotFound"
 components:
   responses:
     BadRequest:
       description: Parâmetro inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Conflito com o estado atual (por exemplo, slug já existe na cidade).
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnprocessableEntity:
+      description: Corpo inválido; `errors` lista os campos.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    VenueNotFound:
+      description: Local não encontrado.
       content:
         application/problem+json:
           schema:
@@ -382,3 +548,124 @@ components:
         - slug
         - sortOrder
         - children
+    VenueInput:
+      type: object
+      description: Corpo de criação e de substituição de um local.
+      properties:
+        cityId:
+          type: integer
+          format: int64
+          description: Id da cidade (de `GET /cities`); deve existir e estar ativa.
+          example: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^.*\\S.*$"
+          example: Sala São Paulo
+        slug:
+          type: string
+          nullable: true
+          maxLength: 200
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: Identificador textual único na cidade; se ausente, é gerado a partir de `name`.
+          example: sala-sao-paulo
+        addressLine:
+          type: string
+          nullable: true
+          maxLength: 255
+          example: Praça Júlio Prestes, 16
+        neighborhood:
+          type: string
+          nullable: true
+          maxLength: 120
+          example: Campos Elíseos
+        postalCode:
+          type: string
+          nullable: true
+          pattern: "^\\d{5}-\\d{3}$"
+          example: 01218-020
+        latitude:
+          type: number
+          nullable: true
+          minimum: -90
+          maximum: 90
+          example: -23.5343
+        longitude:
+          type: number
+          nullable: true
+          minimum: -180
+          maximum: 180
+          example: -46.6395
+        websiteUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          pattern: "^https?://\\S+$"
+          example: https://www.salasaopaulo.art.br
+      required:
+        - cityId
+        - name
+    Venue:
+      type: object
+      description: Local (casa de show, teatro, museu) de uma cidade.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador público do local.
+        cityId:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Sala São Paulo
+        slug:
+          type: string
+          description: Identificador textual único na cidade.
+          example: sala-sao-paulo
+        addressLine:
+          type: string
+          nullable: true
+        neighborhood:
+          type: string
+          nullable: true
+        postalCode:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        websiteUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - cityId
+        - name
+        - slug
+        - createdAt
+        - updatedAt
+    VenuePage:
+      type: object
+      description: Página de locais.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Venue"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+      required:
+        - items
+        - page
