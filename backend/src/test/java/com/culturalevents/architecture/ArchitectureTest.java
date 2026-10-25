@@ -56,4 +56,15 @@ class ArchitectureTest {
                             "com.culturalevents.(*).api..",
                             "com.culturalevents.(*).application..")
                     .allowEmptyShould(true);
+
+    /** venues referencia a cidade só por id e acessa locations apenas pelo caso de uso em application. */
+    @ArchTest
+    public static final ArchRule VENUES_SHOULD_NOT_DEPEND_ON_LOCATIONS_INTERNALS =
+            noClasses()
+                    .that().resideInAPackage("..venues..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "com.culturalevents.locations.domain..",
+                            "com.culturalevents.locations.api..",
+                            "com.culturalevents.locations.infrastructure..")
+                    .allowEmptyShould(true);
 }
