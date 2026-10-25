@@ -126,6 +126,53 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /categories:
+    get:
+      tags: [categories]
+      operationId: listCategories
+      summary: Lista a árvore de categorias
+      description: >-
+        Retorna as categorias raiz, cada uma com suas subcategorias em `children`, ordenadas por
+        `sortOrder` e, em empate, por nome.
+      responses:
+        "200":
+          description: Árvore de categorias.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+  /categories/{slug}:
+    get:
+      tags: [categories]
+      operationId: getCategory
+      summary: Busca uma categoria por slug
+      description: Retorna a categoria (raiz ou subcategoria) com suas subcategorias em `children`.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Identificador textual da categoria.
+          schema:
+            type: string
+            maxLength: 80
+            example: shows
+      responses:
+        "200":
+          description: Categoria encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Categoria não encontrada.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
 components:
   responses:
     BadRequest:
@@ -297,3 +344,41 @@ components:
       required:
         - items
         - page
+    Category:
+      type: object
+      description: Categoria ou subcategoria de eventos (no máximo 2 níveis).
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Identificador interno da categoria.
+          example: 1
+        name:
+          type: string
+          description: Nome da categoria.
+          example: Shows
+        slug:
+          type: string
+          description: Identificador textual único da categoria.
+          example: shows
+        sortOrder:
+          type: integer
+          format: int32
+          description: Posição de exibição entre categorias irmãs.
+          example: 10
+        parentSlug:
+          type: string
+          nullable: true
+          description: Slug da categoria pai; nulo nas categorias raiz.
+          example: shows
+        children:
+          type: array
+          description: Subcategorias, ordenadas; vazio em subcategorias e em raízes sem filhas.
+          items:
+            $ref: "#/components/schemas/Category"
+      required:
+        - id
+        - name
+        - slug
+        - sortOrder
+        - children

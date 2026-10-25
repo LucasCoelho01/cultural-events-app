@@ -28,7 +28,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * migrations não são fixture e nunca devem ser removidos.
  *
  * <p>Cidades de fixture usam {@code ibge_code >= FIXTURE_IBGE_BASE} (faixa que não colide com
- * códigos IBGE reais) e são removidas automaticamente após cada teste.
+ * códigos IBGE reais) e categorias de fixture usam slug com prefixo {@link #FIXTURE_CATEGORY_PREFIX};
+ * ambas são removidas automaticamente após cada teste.
  */
 @SpringBootTest
 public abstract class AbstractPostgresIntegrationTest {
@@ -40,6 +41,9 @@ public abstract class AbstractPostgresIntegrationTest {
 
     /** Primeiro código IBGE reservado a cidades de fixture de teste. */
     protected static final int FIXTURE_IBGE_BASE = 9_000_000;
+
+    /** Prefixo do slug das categorias de fixture, para distingui-las da carga inicial. */
+    protected static final String FIXTURE_CATEGORY_PREFIX = "teste-";
 
     @Autowired
     protected JdbcTemplate jdbcTemplate;
@@ -73,10 +77,33 @@ public abstract class AbstractPostgresIntegrationTest {
         jdbcTemplate.update("DELETE FROM city WHERE ibge_code >= ?", FIXTURE_IBGE_BASE);
     }
 
+    @AfterEach
+    void removeFixtureCategories() {
+        // Subcategorias primeiro: a FK parent_id impede remover a raiz antes.
+        jdbcTemplate.update("DELETE FROM category WHERE slug LIKE ? AND parent_id IS NOT NULL",
+                FIXTURE_CATEGORY_PREFIX + "%");
+        jdbcTemplate.update("DELETE FROM category WHERE slug LIKE ?", FIXTURE_CATEGORY_PREFIX + "%");
+    }
+
     /** Insere uma cidade de fixture ({@code ibgeOffset} é somado a {@link #FIXTURE_IBGE_BASE}). */
     protected void insertFixtureCity(int ibgeOffset, String uf, String name, String slug, boolean active) {
         jdbcTemplate.update(
                 "INSERT INTO city (ibge_code, state_uf, name, slug, timezone, active) VALUES (?, ?, ?, ?, 'America/Sao_Paulo', ?)",
                 FIXTURE_IBGE_BASE + ibgeOffset, uf, name, slug, active);
+    }
+
+    /**
+     * Insere uma categoria de fixture; o slug recebe o prefixo {@link #FIXTURE_CATEGORY_PREFIX}.
+     *
+     * @param parentSlug slug completo do pai (da carga inicial ou de outra fixture), ou {@code null} para raiz
+     * @return o slug completo da categoria inserida
+     */
+    protected String insertFixtureCategory(String slug, String name, String parentSlug, int sortOrder) {
+        String fullSlug = FIXTURE_CATEGORY_PREFIX + slug;
+        jdbcTemplate.update(
+                "INSERT INTO category (parent_id, name, slug, sort_order) "
+                        + "VALUES ((SELECT id FROM category WHERE slug = ?), ?, ?, ?)",
+                parentSlug, name, fullSlug, sortOrder);
+        return fullSlug;
     }
 }
