@@ -7,7 +7,7 @@ Eventos, locais e busca precisam de uma taxonomia estável para classificar o qu
 ## What Changes
 
 - Nova migration `database/migrations/V003__create_categories.sql` criando a tabela `category` (`id`, `parent_id` auto-referenciado, `name`, `slug` único, `sort_order`, `CHECK (parent_id <> id)`) e a carga inicial das categorias raiz, nesta ordem: Shows, Teatro, Exposições, Dança, Cinema, Outros (slugs sem acento).
-- A profundidade máxima de 2 níveis (categoria > subcategoria) é garantida no banco por trigger, e não só pela API, porque o agente da fase 3 também grava nessa tabela.
+- A profundidade máxima de 2 níveis (categoria > subcategoria) é garantida no banco por trigger, contra qualquer escritor (scripts SQL manuais incluídos), e não só pela aplicação.
 - Novos endpoints somente leitura, declarados primeiro em `api/openapi.yaml` (tag `categories`): `GET /categories` (árvore: raízes com `children`) e `GET /categories/{slug}` (categoria com seus `children`, ou 404).
 - Novo DTO `Category` (`id`, `name`, `slug`, `sortOrder`, `parentSlug`, `children`); erros reusam `Problem`.
 - Novo pacote `com.culturalevents.categories.{api,application,domain,infrastructure}` seguindo o padrão de `locations`, com entidade JPA compatível com o script (`ddl-auto=validate`).
@@ -26,7 +26,7 @@ Eventos, locais e busca precisam de uma taxonomia estável para classificar o qu
 
 - **Capabilities afetadas:** `categories` (nova). Nenhuma capability existente muda de requisito.
 - **Banco:** nova migration V003 (tabela, função e trigger de limite de nível, carga inicial); sem alteração de tabelas existentes.
-- **Contrato com o agente de ingestão (fase 3):** `category` passa a fazer parte do schema que o agente lê e grava. O trigger rejeita no banco qualquer inserção ou atualização que crie um terceiro nível. O agente deve usar `slug` como chave natural de lookup e a categoria `outros` como destino padrão quando não houver correspondência; a carga inicial garante que `outros` existe. Os privilégios DML da role `agent_writer` sobre `category` são definidos junto com a fase 3, fora desta change.
+- **Contrato com o agente de ingestão (fase 3):** `category` pertence ao back-end e é mantida só por scripts SQL numerados. O agente só LÊ `category`: faz lookup por `slug` e usa a categoria `outros` como fallback quando não há correspondência (a carga inicial garante que `outros` existe). A role `agent_writer` NÃO recebe privilégio de escrita (INSERT, UPDATE, DELETE) sobre `category`; ela precisa apenas de SELECT, concedido junto com a fase 3, fora desta change. O trigger de 2 níveis permanece como garantia no banco contra qualquer escritor, incluindo scripts SQL manuais.
 - **API:** `api/openapi.yaml` ganha 2 paths e 1 schema novo; sem breaking changes.
 - **Código:** novo pacote `categories` no backend; sem mudança no handler de erros compartilhado.
 - **Dependências:** nenhuma nova.

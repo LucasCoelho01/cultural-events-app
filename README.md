@@ -80,7 +80,7 @@ tabelas `state` e `city`, criadas e populadas por `database/migrations/V002__cre
 (27 UFs e uma cidade inicial ativa).
 
 - **Cadastrar uma nova cidade:** não há endpoint de escrita. Crie um novo script numerado em
-  `database/migrations/` (por exemplo `V003__add_<cidade>.sql`) com um `INSERT INTO city (...)`;
+  `database/migrations/` (por exemplo `V004__add_<cidade>.sql`, usando o próximo número livre) com um `INSERT INTO city (...)`;
   cidades entram com `active = false` a menos que `active` seja informado. Nunca edite um
   script já mergeado.
 - **Cidade padrão:** vem da propriedade `app.default-city` (formato `uf/slug`, por exemplo
@@ -90,6 +90,29 @@ tabelas `state` e `city`, criadas e populadas por `database/migrations/V002__cre
 - **Aplicar a V002 num banco local já existente:** o `initdb.d` só roda em volume novo, então
   recrie o volume (`docker compose down -v` e `docker compose up -d`) ou execute o script
   manualmente.
+
+## Categorias
+
+A API expõe, somente leitura, `GET /api/v1/categories` (árvore: raízes com `children`) e
+`GET /api/v1/categories/{slug}`. As categorias vivem na tabela `category`, criada por
+`database/migrations/V003__create_categories.sql` com 6 raízes: Shows, Teatro, Exposições,
+Dança, Cinema e Outros.
+
+- **Cadastrar categoria ou subcategoria:** não há endpoint de escrita. Crie um novo script
+  numerado em `database/migrations/` com `INSERT INTO category (parent_id, name, slug, sort_order)`;
+  para uma subcategoria, informe o `parent_id` da raiz, por exemplo
+  `(SELECT id FROM category WHERE slug = 'shows')`. Nunca edite um script já mergeado.
+- **Limite de 2 níveis (categoria > subcategoria):** garantido por trigger no banco, contra
+  qualquer escritor, inclusive scripts manuais. Uma inserção ou atualização que crie um terceiro
+  nível falha com `check_violation` (SQLSTATE `23514`).
+- **Agente de ingestão:** só lê `category` (lookup por `slug`) e usa `outros` como fallback
+  quando nenhuma categoria corresponde. Não recebe privilégio de escrita na tabela.
+- **Aplicar a V003 num banco local já existente:** recrie o volume
+  (`docker compose down -v` e `docker compose up -d`) ou execute o script manualmente:
+
+  ```powershell
+  Get-Content -Raw database/migrations/V003__create_categories.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
+  ```
 
 ## Gerando código a partir do contrato OpenAPI
 

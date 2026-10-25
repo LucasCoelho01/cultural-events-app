@@ -5,7 +5,7 @@
 - `locations` fixou o padrão a seguir: openapi-generator (`spring`, `interfaceOnly`, `useTags`) gera `CategoriesApi` e os DTOs em `com.culturalevents.shared.api[.model]`; o controller em `<capability>.api` implementa a interface; camadas `api -> application -> domain <- infrastructure` verificadas por ArchUnit; entidades JPA imutáveis compatíveis com `ddl-auto=validate`; `NotFoundException` do `shared.error` vira 404 `Problem` pelo handler global.
 - `GlobalExceptionHandler` já devolve 400 para parâmetro de path/query inválido e 405 para método não suportado; nada a mudar nele.
 - Migrations são aplicadas por Docker Compose (`initdb.d`, via `psql`) e, nos testes, por `AbstractPostgresIntegrationTest`, que executa o arquivo inteiro com `Statement.execute` (JDBC do Postgres aceita múltiplos comandos e blocos `$$`).
-- O agente da fase 3 grava direto no Postgres sem passar pela API, portanto toda invariante da taxonomia precisa viver no banco.
+- `category` pertence ao back-end e só muda por scripts SQL numerados; o agente da fase 3 apenas lê (lookup por `slug`, fallback em `outros`). Como scripts manuais escrevem direto no banco, sem passar pela aplicação, a invariante de 2 níveis precisa viver no banco.
 
 Motivação e escopo: ver proposal.md.
 
@@ -18,7 +18,7 @@ Motivação e escopo: ver proposal.md.
 **Non-Goals:**
 - Endpoints de escrita; cadastro de subcategorias na carga inicial (entram por scripts V00N futuros).
 - Paginação, filtros, busca textual ou cache: a taxonomia tem dezenas de linhas.
-- Grants da role `agent_writer` (definidos na fase 3) e vínculo de eventos a categorias.
+- Grants da role `agent_writer` (o SELECT em `category` é definido na fase 3; escrita nunca é concedida) e vínculo de eventos a categorias.
 - Impedir por trigger a remoção de uma raiz com filhos ou da categoria `outros`: a FK padrão (`NO ACTION`) já bloqueia remover pai com filhos; proteger `outros` fica para quando houver quem remova linhas.
 
 ## Decisions
@@ -38,8 +38,8 @@ Motivação e escopo: ver proposal.md.
 - A função, ao inserir ou atualizar `parent_id`, lança `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` (SQLSTATE `23514`, a mesma família da `CHECK`) quando:
   1. `NEW.parent_id` não é nulo e o pai referenciado tem `parent_id` não nulo (terceiro nível); ou
   2. `NEW.parent_id` não é nulo, a operação é `UPDATE` e já existem linhas com `parent_id = NEW.id` (raiz com filhos virando filha).
-- A consulta ao pai usa `SELECT ... FOR SHARE`, que bloqueia reparentar o pai por outra transação até o commit e reduz a janela de corrida entre dois escritores (API de manutenção e agente). A corrida residual (filho inserido enquanto o pai vira filho em transações simultâneas) é aceita: os dois escritores são controlados e os scripts de carga são sequenciais.
-- Alternativas descartadas: (a) coluna `level` com `CHECK` composto — duplica informação e exigiria FK composta `(parent_id, 0)`; (b) FK composta `(parent_id, parent_level)` com `level SMALLINT CHECK (level IN (1,2))` — exigiria mudar as colunas pedidas e expõe um campo derivado; (c) validar só na aplicação — o agente escreve direto no banco.
+- A consulta ao pai usa `SELECT ... FOR SHARE`, que bloqueia reparentar o pai por outra transação até o commit e reduz a janela de corrida entre escritores simultâneos. A corrida residual (filho inserido enquanto o pai vira filho em transações simultâneas) é aceita: só scripts SQL numerados e revisados escrevem em `category`, e eles rodam sequencialmente.
+- Alternativas descartadas: (a) coluna `level` com `CHECK` composto — duplica informação e exigiria FK composta `(parent_id, 0)`; (b) FK composta `(parent_id, parent_level)` com `level SMALLINT CHECK (level IN (1,2))` — exigiria mudar as colunas pedidas e expõe um campo derivado; (c) validar só na aplicação — scripts SQL manuais escrevem direto no banco.
 - `UPDATE OF parent_id` evita rodar o trigger em mudanças de `name`/`sort_order`.
 
 **3. Camadas do pacote `categories`**
@@ -65,7 +65,7 @@ Motivação e escopo: ver proposal.md.
 ## Risks / Trade-offs
 
 - [Trigger PL/pgSQL não é executado pelo Hibernate nem aparece no `validate`] → coberto pelos testes de integração do trigger, que rodam sobre as migrations reais.
-- [Corrida residual entre escritores simultâneos pode gerar 3 níveis] → `FOR SHARE` reduz a janela; documentado como aceito dado o regime de escrita (scripts e agente em lotes sequenciais).
+- [Corrida residual entre escritores simultâneos pode gerar 3 níveis] → `FOR SHARE` reduz a janela; documentado como aceito dado o regime de escrita (apenas scripts SQL numerados, executados em sequência).
 - [Carga inicial só com raízes; subcategorias dependem de scripts futuros] → a API devolve `children` vazio e os testes criam subcategorias como fixture.
 - [`children` aninhado no schema OpenAPI recursivo] → o gerador suporta `$ref` recursivo; se gerar problema, fallback é `Category` (raiz) com `children: Subcategory[]`, sem mudar o JSON.
 - [Ordenar por `name` sem collation explícita varia por locale do banco] → usada só como desempate; o `sort_order` é a ordem de produto.
