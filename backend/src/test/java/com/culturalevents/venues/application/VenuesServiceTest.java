@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.hibernate.exception.ConstraintViolationException;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import com.culturalevents.locations.application.CityLookup;
 import com.culturalevents.locations.application.CityRef;
 import com.culturalevents.shared.error.ConflictException;
+import com.culturalevents.shared.error.FieldValidationException;
 import com.culturalevents.shared.error.NotFoundException;
 import com.culturalevents.venues.domain.Venue;
 import com.culturalevents.venues.domain.VenueRepository;
@@ -117,8 +119,8 @@ class VenuesServiceTest {
         when(cities.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(command(1L, "Sala", null)))
-                .isInstanceOfSatisfying(VenueValidationException.class,
-                        ex -> assertThat(ex.getField()).isEqualTo("cityId"));
+                .isInstanceOfSatisfying(FieldValidationException.class,
+                        ex -> assertThat(field(ex)).isEqualTo("cityId"));
         verify(venues, never()).saveAndFlush(any());
     }
 
@@ -127,8 +129,8 @@ class VenuesServiceTest {
         when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, false)));
 
         assertThatThrownBy(() -> service.create(command(1L, "Sala", null)))
-                .isInstanceOfSatisfying(VenueValidationException.class, ex -> {
-                    assertThat(ex.getField()).isEqualTo("cityId");
+                .isInstanceOfSatisfying(FieldValidationException.class, ex -> {
+                    assertThat(field(ex)).isEqualTo("cityId");
                     assertThat(ex.getMessage()).contains("inativa");
                 });
     }
@@ -145,21 +147,21 @@ class VenuesServiceTest {
     @Test
     void nomeQueNaoGeraSlugVira422NoCampoName() {
         when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, true)));
-        when(venues.saveAndFlush(any())).thenThrow(violation("23514"));
+        when(venues.saveAndFlush(any())).thenThrow(violation("23514", "venue_slug_not_empty"));
 
         assertThatThrownBy(() -> service.create(command(1L, "!!!", null)))
-                .isInstanceOfSatisfying(VenueValidationException.class,
-                        ex -> assertThat(ex.getField()).isEqualTo("name"));
+                .isInstanceOfSatisfying(FieldValidationException.class,
+                        ex -> assertThat(field(ex)).isEqualTo("name"));
     }
 
     @Test
     void cidadeRemovidaEmCorridaVira422NoCampoCityId() {
         when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, true)));
-        when(venues.saveAndFlush(any())).thenThrow(violation("23503"));
+        when(venues.saveAndFlush(any())).thenThrow(violation("23503", "venue_city_id_fkey"));
 
         assertThatThrownBy(() -> service.create(command(1L, "Sala", null)))
-                .isInstanceOfSatisfying(VenueValidationException.class,
-                        ex -> assertThat(ex.getField()).isEqualTo("cityId"));
+                .isInstanceOfSatisfying(FieldValidationException.class,
+                        ex -> assertThat(field(ex)).isEqualTo("cityId"));
     }
 
     @Test
@@ -194,8 +196,8 @@ class VenuesServiceTest {
         when(cities.findById(2L)).thenReturn(Optional.of(new CityRef(2L, false)));
 
         assertThatThrownBy(() -> service.replace(id, command(2L, "Sala", null)))
-                .isInstanceOfSatisfying(VenueValidationException.class,
-                        ex -> assertThat(ex.getField()).isEqualTo("cityId"));
+                .isInstanceOfSatisfying(FieldValidationException.class,
+                        ex -> assertThat(field(ex)).isEqualTo("cityId"));
         verify(venues, never()).saveAndFlush(any());
     }
 
@@ -231,6 +233,57 @@ class VenuesServiceTest {
                 .isInstanceOf(ConflictException.class);
     }
 
+    @Test
+    void checkDeLatitudeEIdentificadoPeloNomeDaConstraint() {
+        when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, true)));
+        when(venues.saveAndFlush(any())).thenThrow(violation("23514", "venue_latitude_range"));
+
+        assertThatThrownBy(() -> service.create(command(1L, "Sala", null)))
+                .isInstanceOfSatisfying(FieldValidationException.class,
+                        ex -> assertThat(field(ex)).isEqualTo("latitude"));
+    }
+
+    @Test
+    void checkComNomeDesconhecidoEPropagado() {
+        when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, true)));
+        when(venues.saveAndFlush(any())).thenThrow(violation("23514", "outra_constraint"));
+
+        assertThatThrownBy(() -> service.create(command(1L, "Sala", null)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void trocaDeCidadeDeLocalComEventosVira409() {
+        UUID id = UUID.randomUUID();
+        Venue venue = venue(1L);
+        when(venues.findByPublicId(id)).thenReturn(Optional.of(venue));
+        when(cities.findById(2L)).thenReturn(Optional.of(new CityRef(2L, true)));
+        when(venues.saveAndFlush(venue)).thenThrow(violation("23001", "venue_city_in_use"));
+
+        assertThatThrownBy(() -> service.replace(id, command(2L, "Sala", null)))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void deleteDeLocalComEventoLigadoVira409() {
+        UUID id = UUID.randomUUID();
+        Venue venue = venue(1L);
+        when(venues.findByPublicId(id)).thenReturn(Optional.of(venue));
+        org.mockito.Mockito.doThrow(violation("23503", "event_venue_id_fkey")).when(venues).deleteAndFlush(venue);
+
+        assertThatThrownBy(() -> service.delete(id)).isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void deleteComOutraViolacaoEPropagado() {
+        UUID id = UUID.randomUUID();
+        Venue venue = venue(1L);
+        when(venues.findByPublicId(id)).thenReturn(Optional.of(venue));
+        org.mockito.Mockito.doThrow(violation("23502")).when(venues).deleteAndFlush(venue);
+
+        assertThatThrownBy(() -> service.delete(id)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private static VenueCommand command(Long cityId, String name, String slug) {
         return new VenueCommand(cityId, name, slug, null, null, null, null, null, null);
     }
@@ -239,7 +292,16 @@ class VenuesServiceTest {
         return new Venue(cityId, "Antigo", "antigo", null, null, null, null, null, null);
     }
 
+    private static String field(FieldValidationException ex) {
+        return ex.getViolations().getFirst().field();
+    }
+
     private static DataIntegrityViolationException violation(String sqlState) {
-        return new DataIntegrityViolationException("violação", new SQLException("x", sqlState));
+        return violation(sqlState, null);
+    }
+
+    private static DataIntegrityViolationException violation(String sqlState, String constraint) {
+        return new DataIntegrityViolationException("violação",
+                new ConstraintViolationException("x", new SQLException("x", sqlState), constraint));
     }
 }

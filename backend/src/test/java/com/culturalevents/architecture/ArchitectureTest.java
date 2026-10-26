@@ -67,4 +67,21 @@ class ArchitectureTest {
                             "com.culturalevents.locations.api..",
                             "com.culturalevents.locations.infrastructure..")
                     .allowEmptyShould(true);
+
+    /** events acessa locations, categories e venues apenas pelos casos de uso da camada application. */
+    @ArchTest
+    public static final ArchRule EVENTS_SHOULD_NOT_DEPEND_ON_OTHER_MODULES_INTERNALS =
+            noClasses()
+                    .that().resideInAPackage("..events..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "com.culturalevents.locations.domain..",
+                            "com.culturalevents.locations.api..",
+                            "com.culturalevents.locations.infrastructure..",
+                            "com.culturalevents.categories.domain..",
+                            "com.culturalevents.categories.api..",
+                            "com.culturalevents.categories.infrastructure..",
+                            "com.culturalevents.venues.domain..",
+                            "com.culturalevents.venues.api..",
+                            "com.culturalevents.venues.infrastructure..")
+                    .allowEmptyShould(true);
 }

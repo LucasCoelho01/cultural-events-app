@@ -73,6 +73,27 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void violacoesDeCampoRetornam422ComUmErroPorCampo() throws Exception {
+        mockMvc.perform(get("/test/field-violations"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.title").value("Unprocessable Entity"))
+                .andExpect(jsonPath("$.errors.length()").value(2))
+                .andExpect(jsonPath("$.errors[0].field").value("cityId"))
+                .andExpect(jsonPath("$.errors[0].message").value("cidade inativa"))
+                .andExpect(jsonPath("$.errors[1].field").value("venueId"))
+                .andExpect(content().string(not(org.hamcrest.Matchers.containsString("	at "))));
+    }
+
+    @Test
+    void violacaoDeUmCampoRetorna422() throws Exception {
+        mockMvc.perform(get("/test/field-violation"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("name"));
+    }
+
+    @Test
     void parametroDeQueryInvalidoRetorna400() throws Exception {
         mockMvc.perform(get("/test/param").param("uf", "SPP"))
                 .andExpect(status().isBadRequest())
@@ -164,6 +185,17 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/items/{code}")
         public void item(@PathVariable @Size(min = 2, max = 2) String code, @Valid @RequestBody TestRequest request) {
             // no-op; path restrito + corpo validado ativam a validação de método do MVC
+        }
+
+        @GetMapping("/field-violations")
+        public void fieldViolations() {
+            throw new FieldValidationException(java.util.List.of(
+                    new FieldViolation("cityId", "cidade inativa"), new FieldViolation("venueId", "local inexistente")));
+        }
+
+        @GetMapping("/field-violation")
+        public void fieldViolation() {
+            throw new FieldValidationException("name", "não gera slug");
         }
 
         @GetMapping("/boom")

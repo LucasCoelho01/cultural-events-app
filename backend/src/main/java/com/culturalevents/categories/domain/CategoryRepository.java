@@ -1,5 +1,6 @@
 package com.culturalevents.categories.domain;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +12,8 @@ public interface CategoryRepository {
     Optional<Category> findBySlug(String slug);
 
     Optional<Category> findById(Long id);
+
+    List<Category> findAllByIds(Collection<Long> ids);
 
     /** Subcategorias diretas de {@code parentId}, na mesma ordenação de {@link #findAllOrdered()}. */
     List<Category> findChildrenOrdered(Long parentId);

@@ -94,6 +94,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return unprocessableEntity(errors);
     }
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<Object> handleFieldValidation(FieldValidationException ex) {
+        List<FieldError> errors = ex.getViolations().stream()
+                .map(violation -> new FieldError(violation.field(), violation.message()))
+                .collect(Collectors.toList());
+        return unprocessableEntity(errors);
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Object> handleNotFound(NotFoundException ex) {
         ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());

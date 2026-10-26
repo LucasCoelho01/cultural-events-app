@@ -1,5 +1,6 @@
 package com.culturalevents.categories.infrastructure;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +31,11 @@ class CategoryRepositoryAdapter implements CategoryRepository {
     @Override
     public Optional<Category> findById(Long id) {
         return delegate.findById(id);
+    }
+
+    @Override
+    public List<Category> findAllByIds(Collection<Long> ids) {
+        return delegate.findAllById(ids);
     }
 
     @Override

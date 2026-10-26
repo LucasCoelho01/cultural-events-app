@@ -321,6 +321,180 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/VenueNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: Lista eventos de uma cidade de forma paginada
+      description: >-
+        Retorna os eventos da cidade informada em `city` (padrão `app.default-city`), ordenados pela próxima
+        sessão a partir do maior entre agora e `from`; eventos sem sessão futura vêm depois.
+      parameters:
+        - name: city
+          in: query
+          required: false
+          description: Cidade no formato `uf/slug`; padrão é a cidade configurada em `app.default-city`.
+          schema:
+            type: string
+            pattern: "^[A-Za-z]{2}/[^/\\s]+$"
+            example: sp/sao-paulo
+        - name: category
+          in: query
+          required: false
+          description: Slug da categoria; inclui eventos das suas subcategorias.
+          schema:
+            type: string
+            maxLength: 80
+            example: shows
+        - name: from
+          in: query
+          required: false
+          description: Início do intervalo de sessões (inclusive), ISO 8601 com fuso.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Fim do intervalo de sessões (inclusive), ISO 8601 com fuso.
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          required: false
+          description: Filtra pelo status do evento; sem o parâmetro, todos.
+          schema:
+            $ref: "#/components/schemas/EventStatus"
+        - name: page
+          in: query
+          required: false
+          description: Número da página (baseado em zero).
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Quantidade de itens por página.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Página de eventos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Cidade ou categoria do filtro não encontrada.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    post:
+      tags: [events]
+      operationId: createEvent
+      summary: Cadastra um evento com suas sessões
+      description: Cria o evento; `slug` ausente é gerado a partir de `title` e `status` ausente é `DRAFT`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "201":
+          description: Evento criado.
+          headers:
+            Location:
+              description: URL do evento criado.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /events/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador público (UUID) do evento.
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [events]
+      operationId: getEvent
+      summary: Busca um evento por id
+      responses:
+        "200":
+          description: Evento encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/EventNotFound"
+    put:
+      tags: [events]
+      operationId: replaceEvent
+      summary: Substitui todos os campos e sessões de um evento
+      description: >-
+        Substituição completa com lock otimista: `version` deve ser a atual (senão 409) e `status` é obrigatório.
+        Campos opcionais ausentes passam a nulos e sessões ausentes são removidas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventUpdateInput"
+      responses:
+        "200":
+          description: Evento atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/EventNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      tags: [events]
+      operationId: deleteEvent
+      summary: Remove um evento e suas sessões
+      responses:
+        "204":
+          description: Evento removido.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/EventNotFound"
 components:
   responses:
     BadRequest:
@@ -343,6 +517,12 @@ components:
             $ref: "#/components/schemas/Problem"
     VenueNotFound:
       description: Local não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    EventNotFound:
+      description: Evento não encontrado.
       content:
         application/problem+json:
           schema:
@@ -664,6 +844,305 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Venue"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+      required:
+        - items
+        - page
+    EventStatus:
+      type: string
+      description: Situação do evento.
+      enum: [DRAFT, PUBLISHED, CANCELLED, ARCHIVED]
+    OccurrenceStatus:
+      type: string
+      description: Situação da sessão.
+      enum: [SCHEDULED, CANCELLED, SOLD_OUT]
+    OccurrenceInput:
+      type: object
+      description: Sessão (data e hora) de um evento.
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: "#/components/schemas/OccurrenceStatus"
+          default: SCHEDULED
+      required:
+        - startsAt
+    Occurrence:
+      type: object
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: "#/components/schemas/OccurrenceStatus"
+      required:
+        - startsAt
+        - status
+    CategoryRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - slug
+        - name
+    VenueRef:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+        - id
+        - name
+        - slug
+    EventInput:
+      type: object
+      description: Corpo de criação de um evento.
+      properties:
+        cityId:
+          type: integer
+          format: int64
+          description: Id da cidade (de `GET /cities`); deve existir e estar ativa.
+        categoryId:
+          type: integer
+          format: int64
+          description: Id da categoria (de `GET /categories`).
+        venueId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Id do local; deve ser da mesma cidade do evento.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: "^.*\\S.*$"
+        slug:
+          type: string
+          nullable: true
+          maxLength: 255
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: Único na cidade; se ausente, é gerado a partir de `title`.
+        description:
+          type: string
+          nullable: true
+          maxLength: 20000
+        status:
+          $ref: "#/components/schemas/EventStatus"
+          default: DRAFT
+        ageRating:
+          type: string
+          nullable: true
+          maxLength: 10
+        priceMinCents:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+        priceMaxCents:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+        isFree:
+          type: boolean
+          default: false
+        ticketUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          pattern: "^https?://\\S+$"
+        imageUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          pattern: "^https?://\\S+$"
+        occurrences:
+          type: array
+          items:
+            $ref: "#/components/schemas/OccurrenceInput"
+      required:
+        - cityId
+        - categoryId
+        - title
+    EventUpdateInput:
+      type: object
+      description: >-
+        Corpo de substituição de um evento. Mesmos campos de `EventInput`, mas `version` e `status` são
+        obrigatórios (sem valor padrão).
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: Versão atual do evento (lock otimista).
+        cityId:
+          type: integer
+          format: int64
+        categoryId:
+          type: integer
+          format: int64
+        venueId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: "^.*\\S.*$"
+        slug:
+          type: string
+          nullable: true
+          maxLength: 255
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+        description:
+          type: string
+          nullable: true
+          maxLength: 20000
+        status:
+          $ref: "#/components/schemas/EventStatus"
+        ageRating:
+          type: string
+          nullable: true
+          maxLength: 10
+        priceMinCents:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+        priceMaxCents:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+        isFree:
+          type: boolean
+          default: false
+        ticketUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          pattern: "^https?://\\S+$"
+        imageUrl:
+          type: string
+          nullable: true
+          maxLength: 2048
+          pattern: "^https?://\\S+$"
+        occurrences:
+          type: array
+          items:
+            $ref: "#/components/schemas/OccurrenceInput"
+      required:
+        - version
+        - status
+        - cityId
+        - categoryId
+        - title
+    Event:
+      type: object
+      description: Evento cultural com suas sessões.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador público do evento.
+        cityId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/EventStatus"
+        ageRating:
+          type: string
+          nullable: true
+        priceMinCents:
+          type: integer
+          format: int32
+          nullable: true
+        priceMaxCents:
+          type: integer
+          format: int32
+          nullable: true
+        isFree:
+          type: boolean
+        ticketUrl:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        origin:
+          type: string
+          enum: [MANUAL, AGENT]
+          description: Quem criou o evento (somente leitura).
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        category:
+          $ref: "#/components/schemas/CategoryRef"
+        venue:
+          allOf:
+            - $ref: "#/components/schemas/VenueRef"
+          nullable: true
+        occurrences:
+          type: array
+          description: Sessões ordenadas por `startsAt`.
+          items:
+            $ref: "#/components/schemas/Occurrence"
+      required:
+        - id
+        - cityId
+        - title
+        - slug
+        - status
+        - isFree
+        - origin
+        - version
+        - createdAt
+        - updatedAt
+        - category
+        - occurrences
+    EventPage:
+      type: object
+      description: Página de eventos.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
         page:
           $ref: "#/components/schemas/PageMetadata"
       required:
