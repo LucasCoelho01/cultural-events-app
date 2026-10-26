@@ -140,6 +140,36 @@ e estar ativa. Slug repetido na mesma cidade responde 409.
   Get-Content -Raw database/migrations/V004__create_venues.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
   ```
 
+## Eventos
+
+A API expõe o CRUD de eventos com sessões: `POST /api/v1/events`, `GET /api/v1/events`
+(`?city=uf/slug`, padrão `app.default-city`; `?category=slug`, que inclui subcategorias;
+`?from=` e `?to=` em ISO 8601, mantendo eventos com ao menos uma sessão no intervalo; `?status=`;
+`page`/`size`; ordenado pela próxima sessão), `GET`, `PUT` (substituição completa) e `DELETE
+/api/v1/events/{id}` (sessões removidas em cascata). O `id` é o `public_id` (UUID); a categoria
+(`categoryId`, de `GET /api/v1/categories`) e a cidade (`cityId`) são ids numéricos, e o local
+(`venueId`) é o UUID do local, que precisa ser da mesma cidade do evento.
+
+- **Lock otimista:** a resposta traz `version`. O `PUT` exige `version` e `status` e responde 409 se a
+  `version` estiver desatualizada; todo `PUT` incrementa a versão. O `POST` usa `DRAFT` quando
+  `status` não vem.
+- **Publicação:** `status` `PUBLISHED` exige ao menos uma sessão futura (422 em `occurrences`).
+- **Regras no banco:** slug gerado do título quando nulo, `updated_at`, evento gratuito sem preço
+  positivo, preço máximo não menor que o mínimo, `ends_at >= starts_at` e local da mesma cidade do
+  evento (`V005__create_events.sql`). Um local com eventos não pode ser removido nem mudar de cidade
+  (409 na API).
+- **Contrato com o agente de ingestão:** o agente grava direto em `event` e `occurrence` com
+  `origin = 'AGENT'`. Pode omitir `slug`, `public_id`, `status` e datas; deve informar `city_id`,
+  `category_id` (lookup por `slug`, fallback `outros`) e, se houver, `venue_id` da mesma cidade. Em
+  UPDATEs diretos deve fazer `version = version + 1`, senão o lock otimista da API não percebe a
+  alteração. Dedupe com `ON CONFLICT (city_id, slug)` e `ON CONFLICT (event_id, starts_at)`.
+- **Aplicar a V005 num banco local já existente:** recrie o volume
+  (`docker compose down -v` e `docker compose up -d`) ou execute o script manualmente:
+
+  ```powershell
+  Get-Content -Raw database/migrations/V005__create_events.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
+  ```
+
 ## Gerando código a partir do contrato OpenAPI
 
 `api/openapi.yaml` é a fonte da verdade do contrato HTTP. Qualquer alteração nele (novo

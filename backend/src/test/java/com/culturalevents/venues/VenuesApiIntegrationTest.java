@@ -240,6 +240,66 @@ class VenuesApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 .andExpect(jsonPath("$.status").value(404));
     }
 
+    // --- locais com eventos ligados
+
+    @Test
+    void removeLocalComEventoLigadoRetorna409EMantemOLocal() throws Exception {
+        String id = create("Teste Com Evento", "teste-com-evento");
+        insertFixtureEvent(saoPaulo(), categoryId("shows"), internalId(id), "ev-do-local", "Evento do local");
+
+        mockMvc.perform(delete("/api/v1/venues/" + id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+        mockMvc.perform(get("/api/v1/venues/" + id)).andExpect(status().isOk());
+    }
+
+    @Test
+    void removerOEventoLiberaARemocaoDoLocal() throws Exception {
+        String id = create("Teste Liberado", "teste-liberado");
+        insertFixtureEvent(saoPaulo(), categoryId("shows"), internalId(id), "ev-liberado", "Evento liberado");
+        mockMvc.perform(delete("/api/v1/venues/" + id)).andExpect(status().isConflict());
+
+        jdbcTemplate.update("DELETE FROM event WHERE slug = ?", FIXTURE_EVENT_PREFIX + "ev-liberado");
+
+        mockMvc.perform(delete("/api/v1/venues/" + id)).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void trocarACidadeDeLocalComEventoRetorna409EMantemACidade() throws Exception {
+        insertFixtureCity(47, "RJ", "Cidade Troca Evento", "cidade-troca-evento", true);
+        String id = create("Teste Troca Com Evento", "teste-troca-com-evento");
+        insertFixtureEvent(saoPaulo(), categoryId("shows"), internalId(id), "ev-troca", "Evento da troca");
+
+        mockMvc.perform(put("/api/v1/venues/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(cityId("RJ", "cidade-troca-evento"), "Teste Troca Com Evento",
+                                "teste-troca-com-evento")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+        mockMvc.perform(get("/api/v1/venues/" + id)).andExpect(jsonPath("$.cityId").value(saoPaulo()));
+    }
+
+    @Test
+    void trocarACidadeDeLocalSemEventoRetorna200() throws Exception {
+        insertFixtureCity(48, "RJ", "Cidade Troca Livre", "cidade-troca-livre", true);
+        String id = create("Teste Troca Livre", "teste-troca-livre");
+        long rj = cityId("RJ", "cidade-troca-livre");
+
+        mockMvc.perform(put("/api/v1/venues/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(rj, "Teste Troca Livre", "teste-troca-livre")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cityId").value(rj));
+    }
+
+    @Test
+    void atualizarOutrosCamposDeLocalComEventoContinuaPermitido() throws Exception {
+        String id = create("Teste Edicao", "teste-edicao");
+        insertFixtureEvent(saoPaulo(), categoryId("shows"), internalId(id), "ev-edicao", "Evento da edição");
+
+        mockMvc.perform(put("/api/v1/venues/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(saoPaulo(), "Teste Edicao Renomeado", "teste-edicao")))
+                .andExpect(status().isOk());
+    }
+
     // --- PUT /venues/{id}
 
     @Test
@@ -472,6 +532,10 @@ class VenuesApiIntegrationTest extends AbstractPostgresIntegrationTest {
     }
 
     // --- helpers
+
+    private long internalId(String publicId) {
+        return jdbcTemplate.queryForObject("SELECT id FROM venue WHERE public_id = ?::uuid", Long.class, publicId);
+    }
 
     private long saoPaulo() {
         return cityId("SP", "sao-paulo");

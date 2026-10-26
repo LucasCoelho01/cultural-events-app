@@ -83,7 +83,7 @@ A API SHALL expor `POST /api/v1/events` (tag `events`) com `cityId`, `categoryId
 - **THEN** a API responde HTTP 201 com `venue`, `category` e `occurrences` ordenadas por `startsAt`
 
 #### Scenario: Campos inválidos retornam 422
-- **WHEN** o cliente envia `title` em branco, `slug` `Slug Inválido`, `priceMinCents` -1, `ticketUrl` `ftp://x` ou `status` `FOO`
+- **WHEN** o cliente envia `title` em branco, `slug` `Slug Inválido`, `priceMinCents` -1, ou `ticketUrl` `ftp://x`
 - **THEN** a API responde HTTP 422 com `Problem` (`status=422`) e `errors[]` com um item por campo inválido, e nenhum evento é criado
 
 #### Scenario: Preço incoerente retorna 422
@@ -102,8 +102,8 @@ A API SHALL expor `POST /api/v1/events` (tag `events`) com `cityId`, `categoryId
 - **WHEN** o cliente cria um evento com slug já usado em outra cidade
 - **THEN** a API responde HTTP 201
 
-#### Scenario: Corpo malformado retorna 400
-- **WHEN** o cliente envia `POST /api/v1/events` com JSON ilegível
+#### Scenario: Corpo malformado ou valor de enum desconhecido retorna 400
+- **WHEN** o cliente envia `POST /api/v1/events` com JSON ilegível, ou com `status` (do evento ou da sessão) fora dos valores permitidos, como `FOO`
 - **THEN** a API responde HTTP 400 com `Problem` (`status=400`)
 
 ### Requirement: Publicação exige sessão futura
@@ -188,7 +188,7 @@ A API SHALL expor `GET /api/v1/events/{id}` (`id` UUID) respondendo HTTP 200 ou 
 - **THEN** nenhum `BIGSERIAL` de `event` ou `venue` aparece no corpo ou no `Location`
 
 ### Requirement: Substituição completa com lock otimista
-A API SHALL expor `PUT /api/v1/events/{id}` com o corpo do cadastro mais `version` obrigatório, substituindo todos os campos e sessões (opcional ausente vira nulo, `status` ausente vira `DRAFT`, sessões ausentes são removidas), e responder HTTP 200 com `version` incrementada, 404 se não existir, 409 se `version` estiver desatualizada ou o slug for de outro evento, e 422 se inválido. `id`, `origin` e `createdAt` permanecem; `updatedAt` muda a cada substituição.
+A API SHALL expor `PUT /api/v1/events/{id}` com o corpo do cadastro, mas com `version` e `status` obrigatórios, substituindo todos os campos e sessões (opcional ausente vira nulo, sessões ausentes são removidas), e responder HTTP 200 com `version` incrementada, 404 se não existir, 409 se `version` estiver desatualizada ou o slug for de outro evento, e 422 se inválido. `id`, `origin` e `createdAt` permanecem; `updatedAt` muda a cada substituição.
 
 #### Scenario: Substituição bem-sucedida
 - **WHEN** o cliente envia `PUT /api/v1/events/{id}` com `version` igual à atual e corpo válido com outro conjunto de sessões
@@ -218,9 +218,13 @@ A API SHALL expor `PUT /api/v1/events/{id}` com o corpo do cadastro mais `versio
 - **WHEN** o cliente envia `PUT` com `slug` já usado por outro evento da mesma cidade
 - **THEN** a API responde HTTP 409 e o evento permanece inalterado
 
-#### Scenario: Corpo inválido ou version ausente retorna 422
-- **WHEN** o cliente envia `PUT` sem `version`, com `title` em branco, ou referência inválida em `categoryId` ou `venueId`
-- **THEN** a API responde HTTP 422 com `errors[]` por campo e o evento permanece inalterado
+#### Scenario: Corpo inválido, version ausente ou status ausente retorna 422
+- **WHEN** o cliente envia `PUT` sem `version`, sem `status`, com `title` em branco, ou referência inválida em `categoryId` ou `venueId`
+- **THEN** a API responde HTTP 422 com `errors[]` por campo (`version`, `status`, `title`, `categoryId` ou `venueId`) e o evento permanece inalterado
+
+#### Scenario: Status ausente no PUT não despublica o evento
+- **WHEN** o cliente envia `PUT` de um evento `PUBLISHED` sem o campo `status`
+- **THEN** a API responde HTTP 422 com `errors[]` contendo `field=status` e o evento permanece `PUBLISHED` com a mesma `version`
 
 ### Requirement: Remoção de evento com sessões
 A API SHALL expor `DELETE /api/v1/events/{id}` respondendo HTTP 204 sem corpo e removendo o evento e todas as suas sessões, ou HTTP 404 quando não existir.

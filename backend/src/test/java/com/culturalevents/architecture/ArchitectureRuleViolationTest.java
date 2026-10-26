@@ -74,4 +74,15 @@ class ArchitectureRuleViolationTest {
                 .contains("ViolatingVenuesClass")
                 .contains("locations.domain.City");
     }
+
+    @Test
+    void eventsRuleDetectaViolacaoNoFixture() {
+        EvaluationResult result =
+                ArchitectureTest.EVENTS_SHOULD_NOT_DEPEND_ON_OTHER_MODULES_INTERNALS.evaluate(fixtureClasses);
+
+        assertThat(result.hasViolation()).isTrue();
+        assertThat(result.getFailureReport().toString())
+                .contains("ViolatingEventsClass")
+                .contains("venues.domain.Venue");
+    }
 }

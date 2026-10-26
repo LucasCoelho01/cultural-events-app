@@ -48,6 +48,9 @@ public abstract class AbstractPostgresIntegrationTest {
     /** Prefixo do slug dos locais de fixture, para distingui-los de dados reais. */
     protected static final String FIXTURE_VENUE_PREFIX = "teste-";
 
+    /** Prefixo do slug dos eventos de fixture. */
+    protected static final String FIXTURE_EVENT_PREFIX = "teste-";
+
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -76,15 +79,11 @@ public abstract class AbstractPostgresIntegrationTest {
     }
 
     @AfterEach
-    void removeFixtureCities() {
-        // Locais antes das cidades: venue.city_id referencia city (um só método garante a ordem).
+    void removeFixtures() {
+        // Ordem das FKs, num só método: sessões e eventos, locais, cidades, subcategorias e categorias.
+        jdbcTemplate.update("DELETE FROM event WHERE slug LIKE ?", FIXTURE_EVENT_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM venue WHERE slug LIKE ?", FIXTURE_VENUE_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM city WHERE ibge_code >= ?", FIXTURE_IBGE_BASE);
-    }
-
-    @AfterEach
-    void removeFixtureCategories() {
-        // Subcategorias primeiro: a FK parent_id impede remover a raiz antes.
         jdbcTemplate.update("DELETE FROM category WHERE slug LIKE ? AND parent_id IS NOT NULL",
                 FIXTURE_CATEGORY_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM category WHERE slug LIKE ?", FIXTURE_CATEGORY_PREFIX + "%");
@@ -130,5 +129,27 @@ public abstract class AbstractPostgresIntegrationTest {
     protected long cityId(String uf, String slug) {
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM city WHERE state_uf = ? AND slug = ?", Long.class, uf, slug);
+    }
+
+    /**
+     * Insere um evento de fixture (status {@code DRAFT}); o slug recebe o prefixo {@link #FIXTURE_EVENT_PREFIX}.
+     *
+     * @param venueId id interno do local, ou {@code null}
+     * @return o id interno do evento
+     */
+    protected long insertFixtureEvent(long cityId, long categoryId, Long venueId, String slug, String title) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO event (city_id, category_id, venue_id, title, slug) VALUES (?, ?, ?, ?, ?) RETURNING id",
+                Long.class, cityId, categoryId, venueId, title, FIXTURE_EVENT_PREFIX + slug);
+    }
+
+    /** Insere uma sessão de fixture (status {@code SCHEDULED}) para o evento de id interno {@code eventId}. */
+    protected void insertFixtureOccurrence(long eventId, String startsAt) {
+        jdbcTemplate.update("INSERT INTO occurrence (event_id, starts_at) VALUES (?, ?::timestamptz)", eventId, startsAt);
+    }
+
+    /** Id interno de uma categoria da carga inicial pelo slug. */
+    protected long categoryId(String slug) {
+        return jdbcTemplate.queryForObject("SELECT id FROM category WHERE slug = ?", Long.class, slug);
     }
 }

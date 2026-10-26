@@ -1,5 +1,7 @@
 package com.culturalevents.venues.infrastructure;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +35,11 @@ class VenueRepositoryAdapter implements VenueRepository {
     @Override
     public Optional<Venue> findByPublicId(UUID publicId) {
         return delegate.findByPublicId(publicId);
+    }
+
+    @Override
+    public List<Venue> findAllByIds(Collection<Long> ids) {
+        return delegate.findAllById(ids);
     }
 
     @Override
