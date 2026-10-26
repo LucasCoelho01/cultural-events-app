@@ -6,3 +6,5 @@ dist/
 .vscode/
 .env
 *.log
+
+frontend/src/api/schema.d.ts

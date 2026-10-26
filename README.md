@@ -33,6 +33,19 @@ docker compose down -v
 docker compose up -d
 ```
 
+## Subir o front-end (Windows/PowerShell)
+
+Requer Node 24 e a API rodando em `localhost:8080`:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+npm test
+```
+
+Detalhes em [`frontend/README.md`](frontend/README.md).
+
 ## Subir a API (Windows/PowerShell)
 
 Com o banco já rodando:
