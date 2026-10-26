@@ -37,6 +37,22 @@ O front-end SHALL exibir em `/:uf/:cidade` os eventos da cidade obtidos de `GET 
 - **WHEN** `PageMetadata.totalPages` é maior que 1 e o usuário aciona "Próxima"
 - **THEN** a página seguinte é requisitada (`page` incrementado), e "Anterior" fica desabilitado na primeira página e "Próxima" na última
 
+#### Scenario: Nenhum evento
+- **WHEN** a API responde HTTP 200 com `items` vazio na primeira página (`page=0`)
+- **THEN** a página exibe a mensagem de estado vazio e nenhum botão de paginação ativo
+
+#### Scenario: Carregando
+- **WHEN** a requisição ainda está em andamento
+- **THEN** a página exibe o indicador de carregamento
+
+#### Scenario: Erro da API
+- **WHEN** a API responde HTTP 500 com um `Problem` contendo `detail`
+- **THEN** a página exibe `ErrorMessage` com o texto de `detail`, sem lista
+
+#### Scenario: Cidade inexistente
+- **WHEN** a API responde HTTP 404 com `Problem` para a cidade da rota
+- **THEN** a página exibe `ErrorMessage` com o `detail` e não exibe a lista
+
 ### Requirement: Página da lista na query string
 A página atual da lista SHALL ser refletida na query string `?page=N`, com `N` começando em 1 (primeira página, também quando o parâmetro é omitido), e SHALL ser enviada à API como `page = N - 1` (a API é baseada em zero).
 
@@ -59,22 +75,6 @@ A página atual da lista SHALL ser refletida na query string `?page=N`, com `N` 
 #### Scenario: Página além do total
 - **WHEN** a URL tem `?page=99` e a API responde HTTP 200 com `items` vazio
 - **THEN** a página exibe o estado vazio e o botão "Anterior" permanece ativo para voltar
-
-#### Scenario: Nenhum evento
-- **WHEN** a API responde HTTP 200 com `items` vazio
-- **THEN** a página exibe a mensagem de estado vazio e nenhum botão de paginação ativo
-
-#### Scenario: Carregando
-- **WHEN** a requisição ainda está em andamento
-- **THEN** a página exibe o indicador de carregamento
-
-#### Scenario: Erro da API
-- **WHEN** a API responde HTTP 500 com um `Problem` contendo `detail`
-- **THEN** a página exibe `ErrorMessage` com o texto de `detail`, sem lista
-
-#### Scenario: Cidade inexistente
-- **WHEN** a API responde HTTP 404 com `Problem` para a cidade da rota
-- **THEN** a página exibe `ErrorMessage` com o `detail` e não exibe a lista
 
 ### Requirement: Card de evento
 Cada card SHALL exibir título, categoria (`category.name`), local (`venue.name`, omitido se `venue` for nulo), próxima sessão e preço, e SHALL ser um link para `/:uf/:cidade/eventos/:slug` do evento. A próxima sessão SHALL ser a primeira sessão `SCHEDULED` com `startsAt` posterior ao instante atual; sem ela, o card SHALL exibir "Sem sessões futuras".

@@ -106,6 +106,20 @@ public class EventsService {
         return view(find(id));
     }
 
+    /**
+     * Detalhe público: devolve o evento só se estiver {@code PUBLISHED} na cidade. Evento ausente, de outra cidade
+     * ou em outro status falham com a mesma mensagem, para não revelar a existência de eventos não publicados.
+     */
+    @Transactional(readOnly = true)
+    public EventView getPublished(String uf, String citySlug, String eventSlug) {
+        long cityId = cities.findIdByUfAndSlug(uf, citySlug)
+                .orElseThrow(() -> new NotFoundException("Cidade não encontrada: " + uf + "/" + citySlug));
+        Event event = events.findByCityIdAndSlug(cityId, eventSlug)
+                .filter(found -> found.getStatus() == EventStatus.PUBLISHED)
+                .orElseThrow(() -> new NotFoundException("Evento não encontrado: " + eventSlug));
+        return view(event);
+    }
+
     public EventView create(EventCommand command) {
         Long venueInternalId = validate(command, null);
         Event event = new Event(fields(command, venueInternalId), occurrenceFields(command));

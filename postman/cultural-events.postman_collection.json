@@ -40,6 +40,18 @@
     {
       "key": "futureEnd",
       "value": ""
+    },
+    {
+      "key": "cityUf",
+      "value": ""
+    },
+    {
+      "key": "citySlug",
+      "value": ""
+    },
+    {
+      "key": "eventSlug",
+      "value": ""
     }
   ],
   "item": [
@@ -69,7 +81,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"200\", () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set(\"cityId\", pm.response.json().id);"
+                  "const city = pm.response.json();",
+                  "pm.collectionVariables.set(\"cityId\", city.id);",
+                  "pm.collectionVariables.set(\"cityUf\", city.uf);",
+                  "pm.collectionVariables.set(\"citySlug\", city.slug);"
                 ]
               }
             }
@@ -234,6 +249,7 @@
                   "const body = pm.response.json();",
                   "pm.test(\"version 0\", () => pm.expect(body.version).to.eql(0));",
                   "pm.collectionVariables.set(\"eventId\", body.id);",
+                  "pm.collectionVariables.set(\"eventSlug\", body.slug);",
                   "pm.collectionVariables.set(\"eventVersion\", body.version);"
                 ]
               }
@@ -267,6 +283,42 @@
                   "pm.test(\"local e categoria vêm junto\", () => {",
                   "  pm.expect(body.venue.id).to.eql(pm.collectionVariables.get(\"venueId\"));",
                   "  pm.expect(body.category.slug).to.eql(\"shows\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6a. Detalhe público por cidade e slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cities/{{cityUf}}/{{citySlug}}/events/{{eventSlug}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cities",
+                "{{cityUf}}",
+                "{{citySlug}}",
+                "events",
+                "{{eventSlug}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"é o evento publicado\", () => {",
+                  "  pm.expect(body.id).to.eql(pm.collectionVariables.get(\"eventId\"));",
+                  "  pm.expect(body.status).to.eql(\"PUBLISHED\");",
                   "});"
                 ]
               }

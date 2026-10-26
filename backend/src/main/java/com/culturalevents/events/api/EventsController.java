@@ -53,6 +53,11 @@ class EventsController implements EventsApi {
     }
 
     @Override
+    public ResponseEntity<Event> getPublishedEvent(String uf, String slug, String eventSlug) {
+        return ResponseEntity.ok(EventsMapper.toDto(service.getPublished(uf, slug, eventSlug)));
+    }
+
+    @Override
     public ResponseEntity<Event> replaceEvent(UUID id, EventUpdateInput eventUpdateInput) {
         return ResponseEntity.ok(EventsMapper.toDto(service.replace(id, EventsMapper.toCommand(eventUpdateInput))));
     }

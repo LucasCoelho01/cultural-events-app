@@ -31,5 +31,6 @@ Use sempre `npm test` (e não `npx vitest`), para que a geração rode antes.
 ## Rotas
 
 - `/` redireciona para a cidade padrão (`GET /api/v1/cities/default`)
-- `/:uf/:cidade`, por exemplo `/sp/sao-paulo`
+- `/:uf/:cidade`: lista paginada de eventos publicados com sessões futuras (`?page=N`, começando em 1)
+- `/:uf/:cidade/eventos/:slug`: detalhe do evento (`GET /api/v1/cities/{uf}/{slug}/events/{eventSlug}`)
 - qualquer outro caminho mostra a página 404

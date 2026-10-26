@@ -56,6 +56,16 @@ class EventRepositoryAdapter implements EventRepository {
     }
 
     @Override
+    public Optional<Event> findByCityIdAndSlug(long cityId, String slug) {
+        return entityManager
+                .createQuery("select e from Event e where e.cityId = :cityId and e.slug = :slug", Event.class)
+                .setParameter("cityId", cityId)
+                .setParameter("slug", slug)
+                .getResultStream()
+                .findFirst();
+    }
+
+    @Override
     public Event create(Event event) {
         entityManager.persist(event);
         entityManager.flush();

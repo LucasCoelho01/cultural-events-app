@@ -13,6 +13,8 @@ public interface EventRepository {
 
     Optional<Event> findByPublicId(UUID publicId);
 
+    Optional<Event> findByCityIdAndSlug(long cityId, String slug);
+
     /** Grava um evento novo e relê os valores gerados pelo banco (slug, datas, id público). */
     Event create(Event event);
 

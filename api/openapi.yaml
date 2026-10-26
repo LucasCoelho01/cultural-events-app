@@ -126,6 +126,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /cities/{uf}/{slug}/events/{eventSlug}:
+    parameters:
+      - name: uf
+        in: path
+        required: true
+        description: Sigla da UF (2 letras, sem diferenciar maiúsculas).
+        schema:
+          type: string
+          pattern: "^[A-Za-z]{2}$"
+          example: SP
+      - name: slug
+        in: path
+        required: true
+        description: Identificador textual da cidade dentro da UF.
+        schema:
+          type: string
+          maxLength: 120
+      - name: eventSlug
+        in: path
+        required: true
+        description: Identificador textual do evento dentro da cidade.
+        schema:
+          type: string
+          maxLength: 200
+    get:
+      tags: [events]
+      operationId: getPublishedEvent
+      summary: Busca um evento publicado por cidade e slug
+      description: >-
+        Endpoint público de detalhe. Retorna o evento somente se estiver `PUBLISHED` na cidade informada;
+        eventos em outro status, de outra cidade ou inexistentes respondem 404 sem distinção.
+      responses:
+        "200":
+          description: Evento publicado encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/EventNotFound"
   /categories:
     get:
       tags: [categories]
