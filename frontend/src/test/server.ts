@@ -62,6 +62,35 @@ export function eventPage(items: Event[], page = 0, totalPages = 1) {
   };
 }
 
+/** Category tree: Shows (with the child Rock) and Teatro. */
+export const testCategories = [
+  {
+    id: 1,
+    name: 'Shows',
+    slug: 'shows',
+    sortOrder: 10,
+    parentSlug: null,
+    children: [
+      {
+        id: 2,
+        name: 'Rock',
+        slug: 'rock',
+        sortOrder: 10,
+        parentSlug: 'shows',
+        children: [],
+      },
+    ],
+  },
+  {
+    id: 3,
+    name: 'Teatro',
+    slug: 'teatro',
+    sortOrder: 20,
+    parentSlug: null,
+    children: [],
+  },
+];
+
 export const apiUrl = (path: string) => `*/api/v1${path}`;
 
 export const problem = (status: number, detail: string) =>
@@ -80,4 +109,12 @@ export const server = setupServer(
     HttpResponse.json(makeEvent()),
   ),
   http.get(apiUrl('/venues/:id'), () => HttpResponse.json(testVenue)),
+  http.get(apiUrl('/venues'), () =>
+    HttpResponse.json({
+      items: [testVenue],
+      page: { page: 0, size: 100, totalElements: 1, totalPages: 1 },
+    }),
+  ),
+  http.get(apiUrl('/categories'), () => HttpResponse.json(testCategories)),
+  http.get(apiUrl('/events/:id'), () => HttpResponse.json(makeEvent())),
 );
