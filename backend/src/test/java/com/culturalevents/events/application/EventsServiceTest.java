@@ -61,6 +61,41 @@ class EventsServiceTest {
 
     private final UUID venuePublicId = UUID.randomUUID();
 
+    // --- getPublished
+
+    @Test
+    void detalhePublicoDevolveEventoPublicadoDaCidade() {
+        when(cities.findIdByUfAndSlug("ZZ", "cidade-teste")).thenReturn(Optional.of(1L));
+        when(events.findByCityIdAndSlug(1L, "titulo")).thenReturn(Optional.of(published()));
+        when(categories.findAllByIds(any())).thenReturn(List.of(new CategoryRef(2L, "shows", "Shows")));
+
+        EventView view = service.getPublished("ZZ", "cidade-teste", "titulo");
+
+        assertThat(view.event().getSlug()).isEqualTo("titulo");
+        assertThat(view.category().name()).isEqualTo("Shows");
+    }
+
+    @Test
+    void detalhePublicoRejeitaEventoNaoPublicadoComMesmaMensagemDeInexistente() {
+        when(cities.findIdByUfAndSlug("ZZ", "cidade-teste")).thenReturn(Optional.of(1L));
+        when(events.findByCityIdAndSlug(1L, "titulo")).thenReturn(Optional.of(existing(0)));
+        when(events.findByCityIdAndSlug(1L, "outro")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getPublished("ZZ", "cidade-teste", "titulo"))
+                .isInstanceOf(NotFoundException.class).hasMessage("Evento não encontrado: titulo");
+        assertThatThrownBy(() -> service.getPublished("ZZ", "cidade-teste", "outro"))
+                .isInstanceOf(NotFoundException.class).hasMessage("Evento não encontrado: outro");
+    }
+
+    @Test
+    void detalhePublicoRejeitaCidadeInexistenteSemBuscarEvento() {
+        when(cities.findIdByUfAndSlug("ZZ", "nenhuma")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getPublished("ZZ", "nenhuma", "titulo"))
+                .isInstanceOf(NotFoundException.class).hasMessageContaining("Cidade não encontrada");
+        verify(events, never()).findByCityIdAndSlug(any(Long.class), any());
+    }
+
     // --- create: caminho feliz
 
     @Test
@@ -516,6 +551,11 @@ class EventsServiceTest {
         when(cities.findById(1L)).thenReturn(Optional.of(new CityRef(1L, true)));
         when(categories.findById(2L)).thenReturn(Optional.of(new CategoryRef(2L, "shows", "Shows")));
         when(categories.findAllByIds(any())).thenReturn(List.of(new CategoryRef(2L, "shows", "Shows")));
+    }
+
+    private static Event published() {
+        return new Event(new EventFields(1L, 2L, null, "Título", "titulo", null, EventStatus.PUBLISHED, null, null,
+                null, false, null, null), List.of(new OccurrenceFields(FUTURE, null, OccurrenceStatus.SCHEDULED)));
     }
 
     private static Event existing(int version) {
