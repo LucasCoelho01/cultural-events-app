@@ -33,4 +33,5 @@ Use sempre `npm test` (e não `npx vitest`), para que a geração rode antes.
 - `/` redireciona para a cidade padrão (`GET /api/v1/cities/default`)
 - `/:uf/:cidade`: lista paginada de eventos publicados com sessões futuras (`?page=N`, começando em 1)
 - `/:uf/:cidade/eventos/:slug`: detalhe do evento (`GET /api/v1/cities/{uf}/{slug}/events/{eventSlug}`)
+- `/admin/eventos`, `/admin/eventos/novo` e `/admin/eventos/:id/editar`: administração de eventos da cidade padrão (listar, criar, editar, excluir). **Não há autenticação nesta fase**: a área e a API de escrita são abertas.
 - qualquer outro caminho mostra a página 404

@@ -1,4 +1,4 @@
-import { Outlet, useParams } from 'react-router';
+import { Link, Outlet, useParams } from 'react-router';
 import { useCity, useDefaultCity } from '../api/cities';
 import { ErrorMessage } from './ErrorMessage';
 
@@ -24,7 +24,12 @@ export function Layout() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="flex items-center justify-between bg-white px-6 py-4 shadow">
         <strong>{APP_NAME}</strong>
-        <CityName />
+        <div className="flex items-center gap-4">
+          <CityName />
+          <Link to="/admin/eventos" className="text-sm text-gray-500">
+            Admin
+          </Link>
+        </div>
       </header>
       <main className="p-6">
         <Outlet />
