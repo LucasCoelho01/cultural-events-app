@@ -468,6 +468,19 @@ describe('edit', () => {
     expect(screen.queryByLabelText('Título')).toBeNull();
   });
 
+  it('does not open the form for an event of another city', async () => {
+    serve(sessionEvent({ cityId: testCity.id + 1 }));
+    renderApp(EDIT);
+
+    expect(
+      await screen.findByText(
+        'Este evento pertence a outra cidade e não pode ser editado aqui.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByLabelText('Título')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull();
+  });
+
   it('shows the concurrency notice on a 409 with a newer version, and reloads on demand', async () => {
     let current = sessionEvent();
     server.use(

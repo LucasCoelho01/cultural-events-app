@@ -39,5 +39,5 @@
 
 - [x] 5.1 Verificar que `frontend/src` não contém "São Paulo" nem "sao-paulo" (fora do arquivo gerado)
 - [x] 5.2 `npm run lint`, `npm run build` e `npm test` em `frontend/`
-- [ ] 5.3 Validação manual com back-end e Postgres rodando: criar, editar (com conflito em duas abas), 422 e excluir (parcial: pela interface foram criar, listar e excluir; conflito 409, versão e campos do 422 verificados direto na API; editar e conflito em duas abas pela interface ainda não)
+- [x] 5.3 Validação manual com back-end e Postgres rodando: criar, editar (com conflito em duas abas), 422 e excluir (parcial: pela interface foram criar, listar e excluir; conflito 409, versão e campos do 422 verificados direto na API; editar e conflito em duas abas pela interface ainda não)
 - [x] 5.4 README do `frontend/`: novas rotas `/admin` e aviso de que não há autenticação

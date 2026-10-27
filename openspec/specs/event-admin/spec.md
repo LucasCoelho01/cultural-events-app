@@ -1,7 +1,9 @@
+# event-admin Specification
+
 ## Purpose
 A capability `event-admin` define a área administrativa do front-end para gerenciar eventos da cidade padrão (listar, criar, editar e excluir), usando apenas a API de eventos existente.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Tabela administrativa de eventos
 O front-end SHALL exibir em `/admin/eventos` uma tabela paginada com os eventos da cidade padrão em todos os status, obtidos de `GET /api/v1/events` sem o filtro `status`, mostrando título, status e próxima sessão (no fuso da cidade), com as ações editar e excluir por linha, estados de carregando, vazio e erro (`ErrorMessage`) e paginação por `?page=` (base 1).
@@ -55,6 +57,10 @@ O front-end SHALL oferecer `/admin/eventos/novo` e `/admin/eventos/:id/editar` c
 #### Scenario: Evento a editar não existe
 - **WHEN** `GET /events/{id}` responde HTTP 404 com `Problem`
 - **THEN** a página exibe `ErrorMessage` com o `detail` e não exibe o formulário
+
+#### Scenario: Evento de outra cidade
+- **WHEN** o evento carregado tem `cityId` diferente do id da cidade padrão
+- **THEN** o formulário não é exibido e a página mostra "Este evento pertence a outra cidade e não pode ser editado aqui."
 
 ### Requirement: Opções de categoria e de local
 O seletor de categoria SHALL listar as categorias de `GET /api/v1/categories`, com as subcategorias indentadas sob a categoria pai, e o seletor de local SHALL listar os locais de `GET /api/v1/venues` da cidade padrão (`size=100`), com a opção de não informar local.

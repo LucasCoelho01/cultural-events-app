@@ -5,6 +5,9 @@ import { eventKeys, useEvent, type Event } from '../api/events';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { EventForm } from './EventForm';
 
+export const OTHER_CITY_MESSAGE =
+  'Este evento pertence a outra cidade e não pode ser editado aqui.';
+
 export function NewEventPage() {
   const city = useDefaultCity();
   if (city.error) return <ErrorMessage error={city.error} />;
@@ -28,6 +31,19 @@ export function EditEventPage() {
   const error = city.error ?? event.error;
   if (error) return <ErrorMessage error={error} />;
   if (!city.data || !event.data) return <p aria-busy="true">Carregando…</p>;
+
+  // The form only edits events of the default city (its venues and time zone).
+  if (event.data.cityId !== city.data.id) {
+    return (
+      <ErrorMessage
+        error={{
+          title: 'Outra cidade',
+          status: 403,
+          detail: OTHER_CITY_MESSAGE,
+        }}
+      />
+    );
+  }
 
   const reload = (latest: Event) =>
     queryClient.setQueryData(eventKeys.one(latest.id), latest);
