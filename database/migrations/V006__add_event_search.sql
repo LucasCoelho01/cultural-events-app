@@ -12,9 +12,15 @@
 
 ALTER TABLE event ADD COLUMN search_vector tsvector NOT NULL DEFAULT ''::tsvector;
 
--- Texto sem acentos, em minúsculas e sem o "s" final de palavras com 4 ou mais letras ("shows" -> "show").
+-- Texto sem acentos, em minúsculas, com "ais" final trocado por "al" quando precedido de 4 ou mais letras
+-- ("festivais" -> "festival"; "mais" fica), "eres" final por "er" ("mulheres" -> "mulher", que o stemmer não junta) e sem o
+-- "s" final de palavras com 4 ou mais letras ("shows" -> "show").
 CREATE FUNCTION event_search_text(value text) RETURNS text AS $$
-    SELECT regexp_replace(lower(unaccent(coalesce(value, ''))), '([a-z]{3,})s\M', '\1', 'g');
+    SELECT regexp_replace(
+               regexp_replace(
+                   regexp_replace(lower(unaccent(coalesce(value, ''))), '([a-z]{4,})ais\M', '\1al', 'g'),
+                   '([a-z]{3,})eres\M', '\1er', 'g'),
+               '([a-z]{3,})s\M', '\1', 'g');
 $$ LANGUAGE sql STABLE;
 
 CREATE FUNCTION event_build_search_vector(

@@ -29,8 +29,8 @@
 
 ## 5. Postman
 
-- [ ] 5.1 Em `postman/cultural-events.postman_collection.json`: adicionar "7a. Buscar eventos por texto (q)" (`{{baseUrl}}/events?q=musica`, testes de status 200 e `items` como lista) após a 7, e "q curto → 400" (`?q=a`, status 400 e `status` do `Problem`) em "Cenários de erro". Verificar: coleção é JSON válido, importa no Postman/`postman collection run` e as duas requisições passam contra o back-end local.
+- [x] 5.1 Em `postman/cultural-events.postman_collection.json`: adicionar "7a. Buscar eventos por texto (q)" (`{{baseUrl}}/events?q=musica`, testes de status 200 e `items` como lista) após a 7, e "q curto → 400" (`?q=a`, status 400 e `status` do `Problem`) em "Cenários de erro". Verificar: coleção é JSON válido, importa no Postman/`postman collection run` e as duas requisições passam contra o back-end local.
 
 ## 6. Verificação final
 
-- [ ] 6.1 Rodar `./mvnw verify` (back-end), `npm test && npm run lint && npm run build` (front) e `openspec validate add-fulltext-search`. Verificar: tudo verde; teste manual: `GET /api/v1/events?q=musica` com um evento "Música" criado via SQL direto.
+- [x] 6.1 Rodar `./mvnw verify` (back-end), `npm test && npm run lint && npm run build` (front) e `openspec validate add-fulltext-search`. Verificar: tudo verde; teste manual: `GET /api/v1/events?q=musica` com um evento "Música" criado via SQL direto.

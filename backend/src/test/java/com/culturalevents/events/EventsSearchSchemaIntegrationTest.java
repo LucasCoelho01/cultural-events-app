@@ -47,6 +47,28 @@ class EventsSearchSchemaIntegrationTest extends AbstractPostgresIntegrationTest 
     }
 
     @Test
+    void paresSingularPluralCasamNosDoisSentidos() {
+        String[][] pairs = {{"festival", "festivais"}, {"musical", "musicais"}, {"mulher", "mulheres"},
+                {"show", "shows"}, {"arte", "artes"}};
+        for (String[] pair : pairs) {
+            insertFixtureEvent(sp, shows, null, "par-" + pair[0], "Noite de " + pair[0]);
+            insertFixtureEvent(sp, shows, null, "par-" + pair[1], "Noite de " + pair[1]);
+            for (String term : pair) {
+                assertThat(matches("par-" + pair[0], term)).as("%s -> %s", term, pair[0]).isTrue();
+                assertThat(matches("par-" + pair[1], term)).as("%s -> %s", term, pair[1]).isTrue();
+            }
+        }
+    }
+
+    @Test
+    void maisNaoEAfetadoPelaTrocaDeAis() {
+        assertThat(jdbcTemplate.queryForObject("SELECT event_search_text('Festivais')", String.class))
+                .isEqualTo("festival");
+        assertThat(jdbcTemplate.queryForObject("SELECT event_search_text('Mais')", String.class))
+                .doesNotContain("al");
+    }
+
+    @Test
     void categoriaLocalEDescricaoEntramNoVetor() {
         String venue = insertFixtureVenue(sp, "teatro-vetor", "Teatro Municipal", "Centro");
         long venueId = jdbcTemplate.queryForObject("SELECT id FROM venue WHERE slug = ?", Long.class, venue);
