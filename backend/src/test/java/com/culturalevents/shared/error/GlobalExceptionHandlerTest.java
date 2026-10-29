@@ -54,6 +54,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void parametroInvalidoPelaRegraDeNegocioRetorna400() throws Exception {
+        mockMvc.perform(get("/test/invalid-param"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").value("Parâmetro de requisição inválido: q."));
+    }
+
+    @Test
     void conflitoDeEstadoRetorna409() throws Exception {
         mockMvc.perform(get("/test/conflict"))
                 .andExpect(status().isConflict())
@@ -170,6 +178,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/not-found")
         public void notFound() {
             throw new NotFoundException("recurso não encontrado");
+        }
+
+        @GetMapping("/invalid-param")
+        public void invalidParam() {
+            throw new InvalidRequestParameterException("q");
         }
 
         @GetMapping("/conflict")

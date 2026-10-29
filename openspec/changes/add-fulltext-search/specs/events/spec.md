@@ -16,7 +16,7 @@ O script `V006` SHALL adicionar `event.search_vector` (`tsvector`) com índice G
 - **THEN** a consulta com `q` falha com erro de banco e a API responde HTTP 500 com `Problem` (`status=500`) sem stack trace
 
 ### Requirement: Composição e pesos do vetor de busca
-O vetor SHALL ser mantido por trigger em `INSERT` e em `UPDATE` de título, descrição, categoria ou local, usando o dicionário `portuguese` sobre texto sem acentos: título peso A, nome da categoria e do local peso B, descrição peso C.
+O vetor SHALL ser mantido por trigger em `INSERT` e em `UPDATE` de título, descrição, categoria ou local, usando o dicionário `portuguese` sobre texto sem acentos e sem o "s" final do plural: título peso A, nome da categoria e do local peso B, descrição peso C.
 
 #### Scenario: Busca sem acento encontra texto acentuado
 - **WHEN** existe o evento "Festival de Música" e o vetor é consultado por `musica`

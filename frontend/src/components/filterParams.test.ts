@@ -41,6 +41,39 @@ describe('parseFilters', () => {
   });
 });
 
+describe('search text (q)', () => {
+  it('reads and trims a valid `q`', () => {
+    expect(parse('q=%20musica%20').q).toBe('musica');
+    expect(parse('q=ab&periodo=hoje').q).toBe('ab');
+    expect(parse('q=' + 'a'.repeat(100)).q).toHaveLength(100);
+  });
+
+  it('drops a `q` shorter than 2 or longer than 100 after trimming', () => {
+    expect(parse('q=a').q).toBeUndefined();
+    expect(parse('q=%20%20%20').q).toBeUndefined();
+    expect(parse('q=%20a%20').q).toBeUndefined();
+    expect(parse('q=' + 'a'.repeat(101)).q).toBeUndefined();
+  });
+
+  it('counts as a filter, drops `page` and is cleared with the others', () => {
+    expect(hasFilters(parse('q=rock'))).toBe(true);
+    expect(hasFilters(parse('q=a'))).toBe(false);
+    expect(
+      withFilters(new URLSearchParams('page=3&categoria=shows'), {
+        q: 'rock',
+      }).toString(),
+    ).toBe('categoria=shows&q=rock');
+    expect(
+      withFilters(new URLSearchParams('q=rock'), { q: undefined }).toString(),
+    ).toBe('');
+    expect(
+      clearFilters(
+        new URLSearchParams('q=rock&categoria=shows&page=2'),
+      ).toString(),
+    ).toBe('');
+  });
+});
+
 describe('hasFilters', () => {
   it('is true only when a valid filter is present', () => {
     expect(hasFilters(parse('page=2'))).toBe(false);

@@ -17,6 +17,7 @@ import { CatalogFilters } from './CatalogFilters';
 import { ErrorMessage } from './ErrorMessage';
 import { EventCard } from './EventCard';
 import { Pagination } from './Pagination';
+import { SearchBox } from './SearchBox';
 
 /** One-based page from `?page=`; missing or invalid values mean the first page. */
 export function parsePage(value: string | null): number {
@@ -28,6 +29,7 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parsePage(searchParams.get('page'));
   const [now] = useState(() => new Date());
+  const [searchReset, setSearchReset] = useState(0);
   const parsed = parseFilters(searchParams);
 
   const city = useCity(uf, cidade);
@@ -57,6 +59,7 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
         : null;
 
   const events = useEvents(uf, cidade, page - 1, {
+    q: filters.q,
     category,
     range: range ?? undefined,
     enabled: ready && (!needsZone || Boolean(timeZone)),
@@ -68,7 +71,10 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
 
   const change = (changes: Partial<Filters>) =>
     setSearchParams(withFilters(searchParams, changes));
-  const clear = () => setSearchParams(clearFilters(searchParams));
+  const clear = () => {
+    setSearchReset((count) => count + 1);
+    setSearchParams(clearFilters(searchParams));
+  };
   const goTo = (target: number) => {
     const next = new URLSearchParams(searchParams);
     if (target <= 1) next.delete('page');
@@ -77,7 +83,7 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
   };
 
   const active = hasFilters(filters);
-  const filtering = Boolean(category || range);
+  const filtering = Boolean(filters.q || category || range);
   const items = events.data?.items;
   const emptyWithFilters = items?.length === 0 && filtering;
   const cardRange = range
@@ -89,6 +95,11 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
 
   return (
     <section>
+      <SearchBox
+        key={`${filters.q ?? ''}|${searchReset}`}
+        value={filters.q}
+        onSearch={(q) => change({ q })}
+      />
       <CatalogFilters
         filters={filters}
         categories={categories.data ? flattenCategories(categories.data) : null}
@@ -109,7 +120,11 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
           {items.length === 0 ? (
             filtering ? (
               <div>
-                <p>Nenhum evento para esses filtros</p>
+                <p>
+                  {filters.q
+                    ? `Nenhum evento para "${filters.q}"`
+                    : 'Nenhum evento para esses filtros'}
+                </p>
                 <button
                   type="button"
                   className="mt-2 rounded border border-gray-300 bg-white px-3 py-1"

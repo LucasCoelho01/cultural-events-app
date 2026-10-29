@@ -33,6 +33,7 @@ setweight(to_tsvector('portuguese', unaccent(coalesce(description, ''))), 'C')
 ```
 
 - Nome: `event_set_search_vector`, `BEFORE INSERT OR UPDATE OF title, description, category_id, venue_id`. Roda depois de `event_fill_slug` (ordem alfabética) e sobrescreve qualquer `search_vector` enviado.
+- Plural: o stemmer `portuguese` **não** junta "show" e "shows" (verificado em teste). Uma função `event_search_text(text)` (`lower(unaccent(...))` e remoção do "s" final de palavras com 4+ letras) é aplicada ao texto do vetor e ao termo da consulta, para os dois lados ficarem normalizados do mesmo jeito.
 - Alternativa descartada: calcular na aplicação. Quebra o requisito de o agente escrever direto.
 - Alternativa descartada: `unaccent` embutido num dicionário (`CREATE TEXT SEARCH CONFIGURATION`). Funcionaria e evitaria chamar `unaccent()` na consulta, mas é mais DDL para manter; a função explícita é mais legível e a query usa a mesma expressão.
 - `unaccent()` fica chamada com o dicionário padrão da extensão (schema `public`); a função usa `SET search_path` apenas se os testes mostrarem necessidade.
@@ -50,7 +51,7 @@ setweight(to_tsvector('portuguese', unaccent(coalesce(description, ''))), 'C')
 ### 4. Consulta: `websearch_to_tsquery` com `unaccent`
 
 ```sql
-search_vector @@ websearch_to_tsquery('portuguese', unaccent(:q))
+search_vector @@ websearch_to_tsquery('portuguese', event_search_text(:q))
 ```
 
 `websearch_to_tsquery` nunca falha por sintaxe (aspas abertas, `-`, `OR`), sem tratamento de erro na aplicação. `q` só com palavras ignoradas (`de`, `a`) resulta em consulta vazia e zero resultados (200, vazio). Relevância: `ts_rank(search_vector, query)` (pesos padrão `{0.1, 0.2, 0.4, 1.0}` já fazem A > B > C).
@@ -69,7 +70,7 @@ Ordem: `ts_rank desc, próxima sessão asc nulls last, última sessão desc null
 ### 6. Contrato e validação de `q`
 
 - `openapi.yaml`: `q` (`string`, `minLength: 2`, `maxLength: 100`) em `listEvents`, atualizado antes do código. O gerador valida os limites do texto bruto (HTTP 400 via `ConstraintViolationException`).
-- O `trim` muda o resultado (`"  a "`, `"   "`): `EventsController` faz `q.strip()`, e `EventsService.list` valida o tamanho após o trim, lançando uma exceção que vira **HTTP 400** (hoje só existe 422 para `FieldValidationException`). Será adicionada em `shared.error` uma `InvalidRequestParameterException` tratada em `GlobalExceptionHandler` com o mesmo corpo de "Parâmetro de requisição inválido: q."; `FieldValidationException` não serve (422).
+- O `trim` muda o resultado (`"  a "`, `"   "`): `EventsService.list` aplica `strip()` e valida o tamanho, lançando uma exceção que vira **HTTP 400** (hoje só existe 422 para `FieldValidationException`). Será adicionada em `shared.error` uma `InvalidRequestParameterException` tratada em `GlobalExceptionHandler` com o mesmo corpo de "Parâmetro de requisição inválido: q."; `FieldValidationException` não serve (422).
 - `EventFilter` ganha `String query` (já aparado, ou `null`).
 
 ### 7. Front-end
@@ -78,7 +79,7 @@ Ordem: `ts_rank desc, próxima sessão asc nulls last, última sessão desc null
 - Novo `SearchBox` (form `role="search"`, input controlado por estado local sincronizado com `?q=`, botão "Buscar"); renderizado acima de `CatalogFilters` em `EventList`. Enviar chama `withFilters` (remove `page`).
 - `useEvents` recebe `q`, que entra na `queryKey` e na requisição (`...(q && { q })`).
 - Estado vazio: `filtering` passa a incluir `q`; com `q` mostra `Nenhum evento para "<termo>"`.
-- `api/schema.ts` é regenerado do `openapi.yaml` (arquivo ignorado pelo git).
+- `api/schema.d.ts` é regenerado por `npm run generate:api` (arquivo ignorado pelo git).
 
 ### 8. Postman
 

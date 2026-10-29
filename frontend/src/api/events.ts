@@ -21,7 +21,8 @@ export const eventKeys = {
     from: string,
     to: string,
     category: string,
-  ) => ['events', 'list', uf, slug, page, from, to, category] as const,
+    q: string,
+  ) => ['events', 'list', uf, slug, page, from, to, category, q] as const,
   admin: (page: number) => ['events', 'admin', page] as const,
   one: (id: string) => ['events', 'one', id] as const,
   detail: (uf: string, slug: string, eventSlug: string) =>
@@ -39,6 +40,8 @@ function useFrom(): string {
 }
 
 export type EventsFilters = {
+  /** Search text, already trimmed and between 2 and 100 characters. */
+  q?: string;
   /** Category slug, already confirmed to exist (the API answers 404 otherwise). */
   category?: string;
   /** Sessions window; without it `from` is the current instant and `to` is omitted. */
@@ -52,7 +55,7 @@ export function useEvents(
   uf: string | undefined,
   slug: string | undefined,
   page: number,
-  { category, range, enabled = true }: EventsFilters = {},
+  { q, category, range, enabled = true }: EventsFilters = {},
 ) {
   const now = useFrom();
   const from = range?.from ?? now;
@@ -65,6 +68,7 @@ export function useEvents(
       from,
       to ?? '',
       category ?? '',
+      q ?? '',
     ),
     enabled: Boolean(uf && slug) && enabled,
     placeholderData: keepPreviousData,
@@ -77,6 +81,7 @@ export function useEvents(
             from,
             ...(to && { to }),
             ...(category && { category }),
+            ...(q && { q }),
             page,
             size: EVENTS_PAGE_SIZE,
           },

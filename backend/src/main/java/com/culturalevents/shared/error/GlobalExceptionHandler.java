@@ -102,6 +102,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return unprocessableEntity(errors);
     }
 
+    @ExceptionHandler(InvalidRequestParameterException.class)
+    public ResponseEntity<Object> handleInvalidRequestParameter(InvalidRequestParameterException ex) {
+        return badRequest("Parâmetro de requisição inválido: " + ex.getParameter() + ".");
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Object> handleNotFound(NotFoundException ex) {
         ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
