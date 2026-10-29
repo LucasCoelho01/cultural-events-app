@@ -109,3 +109,47 @@ describe('occurrences', () => {
     expect(nextOccurrence([at('2030-01-01T20:00:00Z')], now)).toBeUndefined();
   });
 });
+
+describe('nextOccurrence with a range', () => {
+  const session = (
+    startsAt: string,
+    status: 'SCHEDULED' | 'CANCELLED' | 'SOLD_OUT' = 'SCHEDULED',
+  ) => ({ startsAt, status });
+  const now = new Date('2099-03-11T13:00:00Z');
+  const weekend = {
+    from: new Date('2099-03-14T03:00:00Z'),
+    to: new Date('2099-03-16T02:59:00Z'),
+  };
+
+  it('picks the first scheduled session inside the range, not the next overall', () => {
+    const wednesday = session('2099-03-11T20:00:00Z');
+    const saturday = session('2099-03-14T20:00:00Z');
+    expect(nextOccurrence([wednesday, saturday], now)).toBe(wednesday);
+    expect(nextOccurrence([wednesday, saturday], now, weekend)).toBe(saturday);
+  });
+
+  it('returns undefined when every session is outside the range', () => {
+    const sessions = [
+      session('2099-03-11T20:00:00Z'),
+      session('2099-03-20T20:00:00Z'),
+    ];
+    expect(nextOccurrence(sessions, now, weekend)).toBeUndefined();
+  });
+
+  it('skips cancelled and sold-out sessions inside the range', () => {
+    const later = session('2099-03-15T20:00:00Z');
+    const sessions = [
+      session('2099-03-14T20:00:00Z', 'CANCELLED'),
+      session('2099-03-14T22:00:00Z', 'SOLD_OUT'),
+      later,
+    ];
+    expect(nextOccurrence(sessions, now, weekend)).toBe(later);
+  });
+
+  it('includes both ends of the range and accepts an open end', () => {
+    const atStart = session('2099-03-14T03:00:00Z');
+    expect(nextOccurrence([atStart], now, weekend)).toBe(atStart);
+    const far = session('2100-01-01T00:00:00Z');
+    expect(nextOccurrence([far], now, { from: weekend.from })).toBe(far);
+  });
+});

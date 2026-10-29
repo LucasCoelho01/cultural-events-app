@@ -4,7 +4,12 @@ import type { components } from './schema';
 
 export type Category = components['schemas']['Category'];
 
-export type CategoryOption = { id: number; name: string; depth: number };
+export type CategoryOption = {
+  id: number;
+  name: string;
+  slug: string;
+  depth: number;
+};
 
 /** Flattens the category tree depth-first, keeping the depth for indentation. */
 export function flattenCategories(
@@ -12,7 +17,7 @@ export function flattenCategories(
   depth = 0,
 ): CategoryOption[] {
   return tree.flatMap((category) => [
-    { id: category.id, name: category.name, depth },
+    { id: category.id, name: category.name, slug: category.slug, depth },
     ...flattenCategories(category.children, depth + 1),
   ]);
 }

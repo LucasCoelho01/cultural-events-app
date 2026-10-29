@@ -31,6 +31,33 @@ O front-end SHALL exibir em `/:uf/:cidade` os eventos da cidade obtidos de `GET 
 - **WHEN** a API responde HTTP 400 com `Problem` (`status=400`, `detail`) a uma requisição com filtros
 - **THEN** a página exibe `ErrorMessage` com o `detail`, sem lista
 
+### Requirement: Card de evento
+Cada card SHALL exibir título, categoria (`category.name`), local (`venue.name`, omitido se `venue` for nulo), próxima sessão e preço, e SHALL ser um link para `/:uf/:cidade/eventos/:slug` do evento. Sem período ativo, a próxima sessão SHALL ser a primeira sessão `SCHEDULED` com `startsAt` posterior ao instante atual; com período ativo, a primeira sessão `SCHEDULED` dentro do intervalo `from`/`to` enviado à API. Sem sessão elegível, o card SHALL exibir "Sem sessões futuras" (sem período) ou "Sem sessões no período" (com período).
+
+#### Scenario: Card completo
+- **WHEN** um evento tem categoria, local, sessões futuras e preço
+- **THEN** o card mostra título, categoria, local, a data da próxima sessão e o preço, e o link aponta para o detalhe do evento
+
+#### Scenario: Evento sem local
+- **WHEN** `venue` é nulo
+- **THEN** o card não mostra local e não falha
+
+#### Scenario: Sem sessão futura agendada
+- **WHEN** todas as sessões do evento estão no passado ou com status diferente de `SCHEDULED`
+- **THEN** o card exibe "Sem sessões futuras" no lugar da data
+
+#### Scenario: Período ativo mostra a sessão do intervalo
+- **WHEN** há `?periodo=fim-de-semana` e o evento tem uma sessão na quarta-feira e outra no sábado, ambas `SCHEDULED`
+- **THEN** o card mostra a data da sessão de sábado, não a de quarta
+
+#### Scenario: Sessão fora do intervalo
+- **WHEN** há período ativo e as únicas sessões `SCHEDULED` do evento estão fora de `from`/`to`
+- **THEN** o card exibe "Sem sessões no período" e não a próxima sessão geral
+
+#### Scenario: Sessão no intervalo não agendada
+- **WHEN** há período ativo e a sessão dentro do intervalo está `CANCELLED` ou `SOLD_OUT`
+- **THEN** o card ignora essa sessão e mostra a próxima `SCHEDULED` dentro do intervalo, ou "Sem sessões no período" se não houver
+
 ## ADDED Requirements
 
 ### Requirement: Filtro de categoria na lista
@@ -49,12 +76,16 @@ A lista SHALL exibir um select com a opção "Todas" e as categorias de `GET /ap
 - **THEN** `categoria` sai da URL e `category` não é enviado à API
 
 #### Scenario: Categoria desconhecida na URL
-- **WHEN** a URL tem `?categoria=inexistente`
-- **THEN** o filtro é ignorado, o select mostra "Todas", `category` não é enviado e não há erro
+- **WHEN** a URL tem `?categoria=inexistente` e `GET /categories` responde HTTP 200 sem esse slug
+- **THEN** `category` não é enviado (evita o HTTP 404 da API), o select mostra "Todas", a lista carrega e não há erro
+
+#### Scenario: Espera pelas categorias
+- **WHEN** a URL tem `?categoria=shows` e `GET /categories` ainda está em andamento
+- **THEN** `GET /events` não é chamado até as categorias carregarem, e depois é chamado uma única vez com `category=shows`
 
 #### Scenario: Falha ao carregar categorias
-- **WHEN** `GET /categories` responde HTTP 500
-- **THEN** a lista de eventos continua funcional, sem o select de categorias e sem derrubar a página
+- **WHEN** `GET /categories` responde HTTP 500 e a URL tem `?categoria=shows`
+- **THEN** `category` não é enviado, a lista de eventos carrega sem filtro de categoria, sem o select e sem derrubar a página
 
 ### Requirement: Atalhos de período na lista
 A lista SHALL oferecer os atalhos "Hoje", "Este fim de semana" e "Próximos 7 dias"; o atalho ativo SHALL enviar `from` e `to` a `GET /events`. Sem atalho nem intervalo personalizado, `from` é o instante atual e `to` não é enviado.
@@ -119,6 +150,10 @@ A lista SHALL oferecer campos de data inicial (`de`) e final (`ate`); o interval
 #### Scenario: Início depois do fim
 - **WHEN** o usuário informa `de` posterior a `ate`
 - **THEN** o intervalo é ignorado (`from` é o instante atual, `to` não é enviado) e o formulário exibe "A data inicial deve ser anterior à final"
+
+#### Scenario: Data final anterior a hoje
+- **WHEN** `ate` é anterior ao dia atual no fuso da cidade (ex.: `?ate=2099-03-10` quando hoje é 11/03/2099), com ou sem `de`
+- **THEN** o intervalo é ignorado como o invertido: `to` não é enviado, `from` é o instante atual e o formulário exibe "A data inicial deve ser anterior à final"
 
 ### Requirement: Intervalos no fuso da cidade
 Os intervalos de período SHALL ser calculados por funções puras que recebem `now` e `timeZone` (`City.timezone`) e enviados em ISO 8601 com offset do fuso da cidade.

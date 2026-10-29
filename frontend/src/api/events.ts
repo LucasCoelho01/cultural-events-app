@@ -14,8 +14,14 @@ export const EVENTS_PAGE_SIZE = 12;
 export const ADMIN_EVENTS_PAGE_SIZE = 20;
 
 export const eventKeys = {
-  list: (uf: string, slug: string, page: number, from: string) =>
-    ['events', 'list', uf, slug, page, from] as const,
+  list: (
+    uf: string,
+    slug: string,
+    page: number,
+    from: string,
+    to: string,
+    category: string,
+  ) => ['events', 'list', uf, slug, page, from, to, category] as const,
   admin: (page: number) => ['events', 'admin', page] as const,
   one: (id: string) => ['events', 'one', id] as const,
   detail: (uf: string, slug: string, eventSlug: string) =>
@@ -32,16 +38,35 @@ function useFrom(): string {
   return from;
 }
 
+export type EventsFilters = {
+  /** Category slug, already confirmed to exist (the API answers 404 otherwise). */
+  category?: string;
+  /** Sessions window; without it `from` is the current instant and `to` is omitted. */
+  range?: { from: string; to?: string };
+  /** False holds the request back, e.g. while the filters are still being resolved. */
+  enabled?: boolean;
+};
+
 /** Published events of a city with future sessions; `page` is zero-based, as in the API. */
 export function useEvents(
   uf: string | undefined,
   slug: string | undefined,
   page: number,
+  { category, range, enabled = true }: EventsFilters = {},
 ) {
-  const from = useFrom();
+  const now = useFrom();
+  const from = range?.from ?? now;
+  const to = range?.to;
   return useQuery({
-    queryKey: eventKeys.list(uf ?? '', slug ?? '', page, from),
-    enabled: Boolean(uf && slug),
+    queryKey: eventKeys.list(
+      uf ?? '',
+      slug ?? '',
+      page,
+      from,
+      to ?? '',
+      category ?? '',
+    ),
+    enabled: Boolean(uf && slug) && enabled,
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const { data, error } = await client.GET('/events', {
@@ -50,6 +75,8 @@ export function useEvents(
             city: `${uf}/${slug}`,
             status: 'PUBLISHED',
             from,
+            ...(to && { to }),
+            ...(category && { category }),
             page,
             size: EVENTS_PAGE_SIZE,
           },

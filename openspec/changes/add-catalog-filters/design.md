@@ -19,21 +19,23 @@ Hoje `EventList` lê só `?page=`, e `useEvents(uf, slug, page)` envia `city`, `
 2. **Módulo `src/format/period.ts` (puro)**, sem React:
    - `type PeriodPreset = 'hoje' | 'fim-de-semana' | '7-dias'`.
    - `periodRange(preset, now: Date, timeZone: string): { from: string; to: string }`.
-   - `customRange(de: string | null, ate: string | null, now, timeZone): { from?: string; to?: string } | null`, retornando `null` quando `de > ate`.
+   - `customRange(de: string | undefined, ate: string | undefined, now, timeZone): DateRange | null`, com `type DateRange = { from: string; to?: string }` (`from` sempre presente; `to` ausente quando só há `de`). Retorna `null` quando não há datas ou quando `isInvalidRange(de, ate, now, timeZone)`: `de > ate` ou `ate` anterior a hoje no fuso da cidade. `EventList` passa o resultado de `isInvalidRange` a `CatalogFilters`, que exibe a mensagem "A data inicial deve ser anterior à final".
    - Dia local de `now`: `isoToLocal(now.toISOString(), timeZone)` dá `AAAA-MM-DDTHH:mm`. O dia da semana e a soma de dias são feitos em aritmética UTC sobre `AAAA-MM-DD` (`Date.UTC` + `getUTCDay`), sem depender do fuso do navegador. Os limites são strings locais `…T00:00` / `…T23:59` convertidas com `localToIso`.
    - Fim de semana: com `dow = getUTCDay()` do dia local, sábado = hoje + (6 − dow) se dow < 6; se dow = 6, hoje; se dow = 0, hoje − 1. Domingo = sábado + 1.
    - `from` final = o maior entre o início do intervalo e `now` (ISO com offset de `localToIso` para o início, `now` formatado em ISO para o clamp). Comparar por `Date.parse`.
    - `to` termina em 23:59 (`localToIso` trabalha em minutos): sessões entre 23:59:01 e 23:59:59 ficam de fora. Aceitável e documentado em comentário.
 
-3. **Parsing da URL em `src/components/catalogFilters.ts` (puro)**: `parseFilters(params: URLSearchParams): { categoria?: string; periodo?: PeriodPreset; de?: string; ate?: string }` e `isActive`. Valida `periodo` contra a lista fixa, `de`/`ate` com `isValidLocal(`${v}T00:00`)`; `periodo` válido descarta `de`/`ate`. A categoria é validada contra as categorias carregadas na UI (slug não encontrado = ignorado); enquanto as categorias carregam, o slug da URL é enviado como está para evitar uma 1ª requisição sem filtro seguida de outra com filtro. Se `GET /categories` falhar, o select some e `categoria` da URL é ignorado (e não enviado).
+3. **Parsing da URL em `src/components/filterParams.ts` (puro)**: `parseFilters(params: URLSearchParams): { categoria?: string; periodo?: PeriodPreset; de?: string; ate?: string }` e `hasFilters`. Valida `periodo` contra a lista fixa, `de`/`ate` com `isValidLocal(`${v}T00:00`)`; `periodo` válido descarta `de`/`ate`. `GET /events` responde 404 para categoria inexistente, então o slug nunca é enviado sem validação: com `?categoria=` na URL, a consulta de eventos fica desabilitada (`enabled: false`, lista em "Carregando eventos…") até `GET /categories` terminar. Depois, `category` só é enviado se o slug existir na árvore (`flattenCategories`); slug inexistente é ignorado sem erro e o select mostra "Todas". Se `GET /categories` falhar, a categoria da URL é ignorada, o select some e a lista carrega sem `category`. Sem `?categoria=`, a lista não espera as categorias.
 
 4. **`useEvents` recebe `{ page, category?, range? }`**, onde `range = { from, to? }` já calculado. A chave de query inclui `category`, `from` e `to`. Sem período, mantém o `from = agora` arredondado ao minuto (`useFrom`). Os intervalos usam o mesmo `now` congelado do componente (`useState(() => new Date())`, já existente em `EventList`) para a chave de query ser estável entre renders.
 
 5. **Componentes**: `CatalogFilters` (select de categoria, botões de atalho de período com `aria-pressed`, dois `input type="date"` para `de`/`ate` e "Limpar filtros") dentro de `EventList` acima da lista. Estado único na URL via `useSearchParams`; toda mudança de filtro cria novos params sem `page`. O formulário de intervalo aplica ao mudar um campo; com `de > ate`, mostra a mensagem e não aplica intervalo (a URL mantém os valores digitados para o usuário corrigir, mas `customRange` devolve `null`).
 
-6. **Estado vazio**: `EventList` escolhe entre "Nenhum evento encontrado." e "Nenhum evento para esses filtros" (+ botão "Limpar filtros") conforme `isActive(filters)` efetivo (filtros válidos aplicados).
+6. **Estado vazio**: `EventList` escolhe entre "Nenhum evento encontrado." e "Nenhum evento para esses filtros" (+ botão "Limpar filtros") conforme `hasFilters(filters)` efetivo (filtros válidos aplicados).
 
-7. **Pagination** não muda; `goTo` passa a preservar os filtros ao alterar `page`.
+7. **Sessão exibida no card com período ativo**: `nextOccurrence(occurrences, now, to?)` em `format/date.ts` ganha o limite superior opcional `to`. `EventCard` recebe `range?: { from: Date; to?: Date }`: com período ativo usa `from` (já ≥ agora) no lugar de `now` e `to` como limite, mostrando a primeira sessão `SCHEDULED` dentro do intervalo; sem período, o comportamento atual (próxima sessão geral). Como `from`/`to` vêm das mesmas funções puras de `period.ts`, o card e a API usam o mesmo intervalo. Sessão `SCHEDULED` dentro do intervalo sempre existe para eventos devolvidos pela API; se não houver (ex.: só sessões `SOLD_OUT` no intervalo), o card exibe "Sem sessões no período".
+
+8. **Pagination** não muda; `goTo` passa a preservar os filtros ao alterar `page`.
 
 ## Risks / Trade-offs
 
@@ -48,4 +50,4 @@ Sem migrações nem mudanças de contrato. Reversível revertendo o commit. Nenh
 
 ## Open Questions
 
-Nenhuma. Premissas assumidas: `de`/`ate` isolados são aceitos (só início ou só fim); `periodo` prevalece sobre `de`/`ate`; intervalo invertido é ignorado com mensagem, sem tocar a API.
+Nenhuma. Premissas assumidas: `de`/`ate` isolados são aceitos (só início ou só fim); `periodo` prevalece sobre `de`/`ate`; intervalo invertido ou com `ate` anterior a hoje é ignorado com mensagem, sem enviar `to`.

@@ -97,7 +97,9 @@ describe('event list', () => {
     renderApp(LIST);
 
     expect(await screen.findByText('Nenhum evento encontrado.')).toBeVisible();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Anterior|Próxima/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the Problem detail on API errors', async () => {

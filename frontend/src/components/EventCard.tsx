@@ -9,6 +9,8 @@ type EventCardProps = {
   cidade: string;
   timeZone: string;
   now: Date;
+  /** Active period: the card shows the first session inside it. */
+  range?: { from: Date; to?: Date };
 };
 
 export function EventCard({
@@ -17,8 +19,9 @@ export function EventCard({
   cidade,
   timeZone,
   now,
+  range,
 }: EventCardProps) {
-  const next = nextOccurrence(event.occurrences, now);
+  const next = nextOccurrence(event.occurrences, now, range);
   const price = formatPrice(event);
   return (
     <li>
@@ -32,7 +35,9 @@ export function EventCard({
         <p className="mt-2 text-sm">
           {next
             ? formatDateTime(next.startsAt, timeZone)
-            : 'Sem sessões futuras'}
+            : range
+              ? 'Sem sessões no período'
+              : 'Sem sessões futuras'}
         </p>
         {price && <p className="text-sm font-medium">{price}</p>}
       </Link>
