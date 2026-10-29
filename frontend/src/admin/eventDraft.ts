@@ -1,7 +1,7 @@
 import type { Event } from '../api/events';
 import type { Problem } from '../api/problem';
 import type { components } from '../api/schema';
-import { isoToLocal, isValidLocal, localToIso } from './datetime';
+import { isoToLocal, isValidLocal, localToIso } from '../format/datetime';
 import { formatReais, parseReais } from './money';
 
 export type EventStatus = components['schemas']['EventStatus'];

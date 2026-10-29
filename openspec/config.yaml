@@ -21,6 +21,7 @@ rules:
   specs:
     - Todo requisito tem ao menos um cenário de erro
     - Códigos HTTP e campos de erro explícitos nos cenários
+    - Cada requisito tem no máximo 500 caracteres e descreve um comportamento; exemplos e casos de borda vão nos cenários.
   design:
     - Listar scripts SQL novos e mudanças no OpenAPI
   tasks:

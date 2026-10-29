@@ -33,12 +33,24 @@ export function futureOccurrences<T extends Occurrence>(
   return occurrences.filter((o) => isFuture(o, now)).sort(byStart);
 }
 
-/** Primeira sessão agendada (`SCHEDULED`) no futuro, se houver. */
+/**
+ * Primeira sessão agendada (`SCHEDULED`) no futuro, se houver. Com `range`, a primeira
+ * `SCHEDULED` dentro de `from`..`to` (ambos inclusivos, como na API), em vez de `now`.
+ */
 export function nextOccurrence<T extends Occurrence>(
   occurrences: T[],
   now: Date,
+  range?: { from: Date; to?: Date },
 ): T | undefined {
-  return futureOccurrences(occurrences, now).find(
-    (o) => o.status === 'SCHEDULED',
-  );
+  if (!range) {
+    return futureOccurrences(occurrences, now).find(
+      (o) => o.status === 'SCHEDULED',
+    );
+  }
+  const from = range.from.getTime();
+  const to = range.to?.getTime() ?? Infinity;
+  return [...occurrences].sort(byStart).find((o) => {
+    const start = new Date(o.startsAt).getTime();
+    return o.status === 'SCHEDULED' && start >= from && start <= to;
+  });
 }
