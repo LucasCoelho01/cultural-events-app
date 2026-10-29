@@ -33,6 +33,7 @@ import com.culturalevents.locations.application.CityRef;
 import com.culturalevents.shared.error.ConflictException;
 import com.culturalevents.shared.error.FieldValidationException;
 import com.culturalevents.shared.error.FieldViolation;
+import com.culturalevents.shared.error.InvalidRequestParameterException;
 import com.culturalevents.shared.error.NotFoundException;
 import com.culturalevents.venues.application.VenueLookup;
 import com.culturalevents.venues.application.VenueRef;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class EventsServiceTest {
@@ -461,11 +463,49 @@ class EventsServiceTest {
     // --- list
 
     @Test
+    void listagemSemQNaoFiltraPorTexto() {
+        when(cities.defaultCityId()).thenReturn(10L);
+        when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        service.list(null, null, null, null, null, null, 0, 20);
+
+        assertThat(captureFilter().query()).isNull();
+    }
+
+    @Test
+    void qEhAparadoEVaiParaOFiltro() {
+        when(cities.defaultCityId()).thenReturn(10L);
+        when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        service.list(null, null, null, null, null, "  show  ", 0, 20);
+        assertThat(captureFilter().query()).isEqualTo("show");
+    }
+
+    @Test
+    void qNosLimitesEhAceito() {
+        when(cities.defaultCityId()).thenReturn(10L);
+        when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        service.list(null, null, null, null, null, "ab", 0, 20);
+        service.list(null, null, null, null, null, "a".repeat(100), 0, 20);
+    }
+
+    @Test
+    void qForaDosLimitesDepoisDoTrimEhRejeitado() {
+        for (String invalid : List.of("", "   ", "a", "  a ", "a".repeat(101), " " + "a".repeat(101))) {
+            assertThatThrownBy(() -> service.list(null, null, null, null, null, invalid, 0, 20))
+                    .isInstanceOf(InvalidRequestParameterException.class)
+                    .hasMessageContaining("q");
+        }
+        verifyNoInteractions(events);
+    }
+
+    @Test
     void listagemSemCidadeUsaACidadePadraoEAReferenciaEAgora() {
         when(cities.defaultCityId()).thenReturn(10L);
         when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
 
-        service.list(null, null, null, null, null, 0, 20);
+        service.list(null, null, null, null, null, null, 0, 20);
 
         EventFilter filter = captureFilter();
         assertThat(filter.cityId()).isEqualTo(10L);
@@ -478,7 +518,7 @@ class EventsServiceTest {
         when(cities.defaultCityId()).thenReturn(10L);
         when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
 
-        service.list(null, null, FUTURE, null, null, 0, 20);
+        service.list(null, null, FUTURE, null, null, null, 0, 20);
         assertThat(captureFilter().reference()).isEqualTo(FUTURE);
     }
 
@@ -487,7 +527,7 @@ class EventsServiceTest {
         when(cities.defaultCityId()).thenReturn(10L);
         when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
 
-        service.list(null, null, PAST, null, null, 0, 20);
+        service.list(null, null, PAST, null, null, null, 0, 20);
         assertThat(captureFilter().reference()).isEqualTo(NOW);
     }
 
@@ -497,7 +537,7 @@ class EventsServiceTest {
         when(categories.findIdsWithDescendantsBySlug("shows")).thenReturn(Optional.of(List.of(2L, 5L)));
         when(events.search(any(), any())).thenReturn(new PageImpl<>(List.of()));
 
-        service.list("xx/cidade", "shows", PAST, FUTURE, EventStatus.PUBLISHED, 1, 5);
+        service.list("xx/cidade", "shows", PAST, FUTURE, EventStatus.PUBLISHED, null, 1, 5);
 
         EventFilter filter = captureFilter();
         assertThat(filter.cityId()).isEqualTo(3L);
@@ -510,12 +550,12 @@ class EventsServiceTest {
     @Test
     void listagemComCidadeOuCategoriaInexistenteVira404() {
         when(cities.findIdByUfAndSlug("xx", "nada")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.list("xx/nada", null, null, null, null, 0, 20))
+        assertThatThrownBy(() -> service.list("xx/nada", null, null, null, null, null, 0, 20))
                 .isInstanceOf(NotFoundException.class);
 
         when(cities.defaultCityId()).thenReturn(10L);
         when(categories.findIdsWithDescendantsBySlug("nada")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.list(null, "nada", null, null, null, 0, 20))
+        assertThatThrownBy(() -> service.list(null, "nada", null, null, null, null, 0, 20))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -530,7 +570,7 @@ class EventsServiceTest {
         when(categories.findAllByIds(any())).thenReturn(List.of(new CategoryRef(2L, "shows", "Shows")));
         when(venues.findAllByIds(any())).thenReturn(List.of(new VenueRef(9L, venuePublicId, 1L, "Sala", "sala")));
 
-        Page<EventView> result = service.list(null, null, null, null, null, 0, 20);
+        Page<EventView> result = service.list(null, null, null, null, null, null, 0, 20);
 
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent().get(0).venue().name()).isEqualTo("Sala");

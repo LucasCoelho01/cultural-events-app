@@ -34,6 +34,7 @@ import com.culturalevents.locations.application.CityRef;
 import com.culturalevents.shared.error.ConflictException;
 import com.culturalevents.shared.error.FieldValidationException;
 import com.culturalevents.shared.error.FieldViolation;
+import com.culturalevents.shared.error.InvalidRequestParameterException;
 import com.culturalevents.shared.error.NotFoundException;
 import com.culturalevents.shared.persistence.ConstraintViolations;
 import com.culturalevents.venues.application.VenueLookup;
@@ -46,6 +47,8 @@ public class EventsService {
     private static final String UNIQUE_VIOLATION = "23505";
     private static final String FOREIGN_KEY_VIOLATION = "23503";
     private static final String CHECK_VIOLATION = "23514";
+    private static final int MIN_SEARCH_LENGTH = 2;
+    private static final int MAX_SEARCH_LENGTH = 100;
 
     /** Constraints que o banco pode rejeitar mesmo após a validação de negócio, identificadas pelo nome. */
     private static final Map<String, FieldViolation> CONSTRAINT_VIOLATIONS = Map.ofEntries(
@@ -86,19 +89,32 @@ public class EventsService {
     /**
      * @param city {@code uf/slug} (formato já validado pelo contrato) ou {@code null} para a cidade padrão
      * @param category slug da categoria (inclui subcategorias) ou {@code null}
+     * @param q texto da busca (2 a 100 caracteres sem os espaços das pontas) ou {@code null}
      */
     @Transactional(readOnly = true)
     public Page<EventView> list(String city, String category, OffsetDateTime from, OffsetDateTime to,
-            EventStatus status, int page, int size) {
+            EventStatus status, String q, int page, int size) {
+        String query = searchTerm(q);
         long cityId = city == null ? cities.defaultCityId() : resolveCityId(city);
         List<Long> categoryIds = category == null ? null : categories.findIdsWithDescendantsBySlug(category)
                 .orElseThrow(() -> new NotFoundException("Categoria não encontrada: " + category));
         OffsetDateTime now = OffsetDateTime.now(clock);
         OffsetDateTime reference = from != null && from.isAfter(now) ? from : now;
 
-        Page<Event> result = events.search(new EventFilter(cityId, categoryIds, from, to, status, reference),
+        Page<Event> result = events.search(new EventFilter(cityId, categoryIds, from, to, status, reference, query),
                 PageRequest.of(page, size));
         return new PageImpl<>(views(result.getContent()), result.getPageable(), result.getTotalElements());
+    }
+
+    private static String searchTerm(String q) {
+        if (q == null) {
+            return null;
+        }
+        String term = q.strip();
+        if (term.length() < MIN_SEARCH_LENGTH || term.length() > MAX_SEARCH_LENGTH) {
+            throw new InvalidRequestParameterException("q");
+        }
+        return term;
     }
 
     @Transactional(readOnly = true)

@@ -30,9 +30,9 @@ class EventsController implements EventsApi {
 
     @Override
     public ResponseEntity<EventPage> listEvents(String city, String category, OffsetDateTime from, OffsetDateTime to,
-            com.culturalevents.shared.api.model.EventStatus status, Integer page, Integer size) {
+            com.culturalevents.shared.api.model.EventStatus status, String q, Integer page, Integer size) {
         EventStatus domainStatus = status == null ? null : EventStatus.valueOf(status.name());
-        Page<EventView> result = service.list(city, category, from, to, domainStatus, page, size);
+        Page<EventView> result = service.list(city, category, from, to, domainStatus, q, page, size);
         EventPage body = new EventPage(
                 result.getContent().stream().map(EventsMapper::toDto).toList(),
                 PageMetadataMapper.from(result));

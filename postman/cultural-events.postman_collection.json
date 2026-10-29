@@ -361,6 +361,41 @@
           ]
         },
         {
+          "name": "7a. Buscar eventos por texto (q)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events?q=postman",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "postman"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json().items;",
+                  "pm.test(\"evento aparece na busca\", () => pm.expect(items.map(e => e.id)).to.include(pm.collectionVariables.get(\"eventId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "8. Editar evento (PUT com version)",
           "request": {
             "method": "PUT",
@@ -790,6 +825,40 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "q curto → 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events?q=a",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "a"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem com status 400\", () => pm.expect(pm.response.json().status).to.eql(400));"
                 ]
               }
             }

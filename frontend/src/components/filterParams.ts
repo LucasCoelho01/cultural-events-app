@@ -1,29 +1,44 @@
 import { isValidLocal } from '../format/datetime';
 import { PERIOD_PRESETS, type PeriodPreset } from '../format/period';
 
+export const MIN_SEARCH_LENGTH = 2;
+export const MAX_SEARCH_LENGTH = 100;
+
 export type CatalogFilters = {
+  /** Search text, already trimmed and within the length the API accepts. */
+  q?: string;
   categoria?: string;
   periodo?: PeriodPreset;
   de?: string;
   ate?: string;
 };
 
-export const FILTER_KEYS = ['categoria', 'periodo', 'de', 'ate'] as const;
+export const FILTER_KEYS = ['q', 'categoria', 'periodo', 'de', 'ate'] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 const isDay = (value: string | null): value is string =>
   value !== null && isValidLocal(`${value}T00:00`);
 
+/** Trimmed search text, or `undefined` when it is outside what the API accepts. */
+export function normalizeSearch(value: string | null): string | undefined {
+  const text = value?.trim() ?? '';
+  return text.length >= MIN_SEARCH_LENGTH && text.length <= MAX_SEARCH_LENGTH
+    ? text
+    : undefined;
+}
+
 /** Filters from the query string; invalid values are dropped, `periodo` beats `de`/`ate`. */
 export function parseFilters(params: URLSearchParams): CatalogFilters {
+  const q = normalizeSearch(params.get('q'));
   const categoria = params.get('categoria')?.trim() || undefined;
   const periodo = params.get('periodo');
   if (PERIOD_PRESETS.includes(periodo as PeriodPreset)) {
-    return { categoria, periodo: periodo as PeriodPreset };
+    return { q, categoria, periodo: periodo as PeriodPreset };
   }
   const de = params.get('de');
   const ate = params.get('ate');
   return {
+    q,
     categoria,
     de: isDay(de) ? de : undefined,
     ate: isDay(ate) ? ate : undefined,
