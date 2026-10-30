@@ -51,6 +51,9 @@ public abstract class AbstractPostgresIntegrationTest {
     /** Prefixo do slug dos eventos de fixture. */
     protected static final String FIXTURE_EVENT_PREFIX = "teste-";
 
+    /** Prefixo do code das fontes e do external_id dos vínculos de fixture. */
+    protected static final String FIXTURE_SOURCE_PREFIX = "teste-";
+
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -81,6 +84,13 @@ public abstract class AbstractPostgresIntegrationTest {
     @AfterEach
     void removeFixtures() {
         // Ordem das FKs, num só método: sessões e eventos, locais, cidades, subcategorias e categorias.
+        // Vínculos e execuções antes dos eventos: excluir o evento só deixaria uma lápide (event_id nulo).
+        jdbcTemplate.update("DELETE FROM event_source_link WHERE external_id LIKE ? "
+                + "OR source_id IN (SELECT id FROM source WHERE code LIKE ?)",
+                FIXTURE_SOURCE_PREFIX + "%", FIXTURE_SOURCE_PREFIX + "%");
+        jdbcTemplate.update("DELETE FROM ingestion_run WHERE source_id IN (SELECT id FROM source WHERE code LIKE ?)",
+                FIXTURE_SOURCE_PREFIX + "%");
+        jdbcTemplate.update("DELETE FROM source WHERE code LIKE ?", FIXTURE_SOURCE_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM event WHERE slug LIKE ?", FIXTURE_EVENT_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM venue WHERE slug LIKE ?", FIXTURE_VENUE_PREFIX + "%");
         jdbcTemplate.update("DELETE FROM city WHERE ibge_code >= ?", FIXTURE_IBGE_BASE);
@@ -146,6 +156,24 @@ public abstract class AbstractPostgresIntegrationTest {
     /** Insere uma sessão de fixture (status {@code SCHEDULED}) para o evento de id interno {@code eventId}. */
     protected void insertFixtureOccurrence(long eventId, String startsAt) {
         jdbcTemplate.update("INSERT INTO occurrence (event_id, starts_at) VALUES (?, ?::timestamptz)", eventId, startsAt);
+    }
+
+    /**
+     * Insere uma fonte de fixture; o code recebe o prefixo {@link #FIXTURE_SOURCE_PREFIX}.
+     *
+     * @param cityId id da cidade, ou {@code null} para fonte nacional
+     * @return o id da fonte
+     */
+    protected long insertFixtureSource(String code, Long cityId) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO source (code, name, base_url, city_id) VALUES (?, ?, 'https://exemplo.test', ?) RETURNING id",
+                Long.class, FIXTURE_SOURCE_PREFIX + code, "Fonte " + code, cityId);
+    }
+
+    /** Insere uma execução de fixture ({@code RUNNING}) da fonte e devolve o id. */
+    protected long insertFixtureRun(long sourceId) {
+        return jdbcTemplate.queryForObject(
+                "INSERT INTO ingestion_run (source_id) VALUES (?) RETURNING id", Long.class, sourceId);
     }
 
     /** Id interno de uma categoria da carga inicial pelo slug. */

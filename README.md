@@ -183,6 +183,39 @@ A API expõe o CRUD de eventos com sessões: `POST /api/v1/events`, `GET /api/v1
   Get-Content -Raw database/migrations/V005__create_events.sql | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
   ```
 
+## Ingestão (agente) e a role `agent_writer`
+
+O agente de ingestão (Python, repo separado) grava direto no Postgres. O contrato completo —
+tabelas, regras de escrita, `locked_fields`, lápides e versão — está em
+[`database/AGENT_CONTRACT.md`](database/AGENT_CONTRACT.md) (versão do contrato `1.0`).
+
+- **Schema de ingestão (`V007__add_ingestion_schema.sql`):** `source` (fonte `sympla` já cadastrada),
+  `event_source_link`, `ingestion_run`, `schema_contract` e `event.locked_fields`.
+- **Role (`V008__create_agent_writer_role.sql`):** `agent_writer` com `LOGIN`, **sem senha no script**.
+  Lê tudo; escreve (`INSERT/UPDATE/DELETE`) só em `event`, `occurrence`, `venue`, `source`,
+  `event_source_link` e `ingestion_run`; não escreve em `category`, `city`, `state` nem
+  `schema_contract` e não faz DDL. Tabela nova só é escrita pelo agente se a migration que a cria
+  conceder o acesso.
+- **Definir a senha (à mão, nunca em script versionado):**
+
+  ```powershell
+  docker compose exec -T postgres psql -U cultural_events -d cultural_events -c "ALTER ROLE agent_writer PASSWORD 'troque-esta-senha'"
+  ```
+
+- **Aplicar a V007 e a V008 num banco local já existente:** recrie o volume
+  (`docker compose down -v` e `docker compose up -d`) ou execute os scripts em ordem:
+
+  ```powershell
+  foreach ($script in "V007__add_ingestion_schema.sql", "V008__create_agent_writer_role.sql") {
+      Get-Content -Raw "database/migrations/$script" | docker compose exec -T postgres psql -U cultural_events -d cultural_events -v ON_ERROR_STOP=1
+  }
+  ```
+
+- **Correção manual vence:** `PUT /api/v1/events/{id}` em evento `origin = 'AGENT'` acrescenta em
+  `locked_fields` as colunas alteradas (e `occurrences`, se as sessões mudaram); o agente não as
+  sobrescreve. Excluir um evento do agente pela API deixa o vínculo como lápide (`event_id` nulo), e
+  o agente não o recria.
+
 ## Gerando código a partir do contrato OpenAPI
 
 `api/openapi.yaml` é a fonte da verdade do contrato HTTP. Qualquer alteração nele (novo

@@ -24,6 +24,7 @@ import com.culturalevents.categories.application.CategoryRef;
 import com.culturalevents.events.domain.Event;
 import com.culturalevents.events.domain.EventFields;
 import com.culturalevents.events.domain.EventFilter;
+import com.culturalevents.events.domain.EventOrigin;
 import com.culturalevents.events.domain.EventRepository;
 import com.culturalevents.events.domain.EventStatus;
 import com.culturalevents.events.domain.OccurrenceFields;
@@ -585,6 +586,135 @@ class EventsServiceTest {
         ArgumentCaptor<EventFilter> captor = ArgumentCaptor.forClass(EventFilter.class);
         verify(events).search(captor.capture(), any(Pageable.class));
         return captor.getValue();
+    }
+
+    // --- replace: "correção manual vence" (locked_fields)
+
+    @Test
+    void substituicaoDeEventoDoAgenteTravaTituloEPreco() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Novo título", 5000, null, FUTURE), 0));
+
+        assertThat(event.getLockedFields()).containsExactly("title", "price_min_cents");
+    }
+
+    @Test
+    void substituicaoDeEventoDoAgenteSoComSessoesAlteradasTravaOccurrences() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Título", null, null, FUTURE, FUTURE.plusDays(1)), 0));
+
+        assertThat(event.getLockedFields()).containsExactly("occurrences");
+    }
+
+    @Test
+    void substituicaoDeEventoDoAgenteSoComTituloNaoTravaOccurrences() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Outro título", null, null, FUTURE), 0));
+
+        assertThat(event.getLockedFields()).containsExactly("title");
+    }
+
+    @Test
+    void substituicaoSemMudancasDeEventoDoAgenteNaoTravaNada() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Título", null, null, FUTURE), 0));
+
+        assertThat(event.getLockedFields()).isEmpty();
+    }
+
+    @Test
+    void campoJaTravadoNaoDuplica() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Primeira", null, null, FUTURE), 0));
+        service.replace(id, versioned(agentCommand("Segunda", null, null, FUTURE), 0));
+
+        assertThat(event.getLockedFields()).containsExactly("title");
+    }
+
+    @Test
+    void mesmoInstanteEmOutroDeslocamentoNaoContaComoSessaoAlterada() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Título", null, null,
+                FUTURE.withOffsetSameInstant(ZoneOffset.ofHours(-3))), 0));
+
+        assertThat(event.getLockedFields()).isEmpty();
+    }
+
+    @Test
+    void slugEmBrancoNaoContaComoMudancaDeSlug() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Título", null, "   ", FUTURE), 0));
+
+        assertThat(event.getLockedFields()).isEmpty();
+    }
+
+    @Test
+    void substituicaoDeEventoManualNaoTravaNada() {
+        validReferences();
+        Event event = existing(0);
+        UUID id = stubFind(event);
+
+        service.replace(id, versioned(agentCommand("Mudou", 5000, null, FUTURE, FUTURE.plusDays(1)), 0));
+
+        assertThat(event.getLockedFields()).isEmpty();
+    }
+
+    @Test
+    void versaoDesatualizadaOuValidacaoInvalidaNaoAlteramOsLocks() {
+        validReferences();
+        Event event = agentEvent();
+        UUID id = stubFind(event);
+
+        assertThatThrownBy(() -> service.replace(id, versioned(agentCommand("Mudou", null, null, FUTURE), 9)))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.replace(id, new EventCommand(1L, 2L, null, "Mudou", null, null, EventStatus.DRAFT, null, 10, 5, false, null,
+                null, List.of(), 0)))
+                .isInstanceOf(FieldValidationException.class);
+
+        assertThat(event.getLockedFields()).isEmpty();
+    }
+
+    private UUID stubFind(Event event) {
+        UUID id = UUID.randomUUID();
+        when(events.findByPublicId(id)).thenReturn(Optional.of(event));
+        when(events.update(event)).thenReturn(event);
+        return id;
+    }
+
+    private static Event agentEvent() {
+        Event event = existing(0);
+        ReflectionTestUtils.setField(event, "origin", EventOrigin.AGENT);
+        return event;
+    }
+
+    private static EventCommand agentCommand(String title, Integer priceMin, String slug, OffsetDateTime... startsAt) {
+        List<OccurrenceCommand> occurrences = new java.util.ArrayList<>();
+        for (OffsetDateTime start : startsAt) {
+            occurrences.add(new OccurrenceCommand(start, null, OccurrenceStatus.SCHEDULED));
+        }
+        return new EventCommand(1L, 2L, null, title, slug, null, EventStatus.DRAFT, null, priceMin, null, false, null,
+                null, occurrences, null);
     }
 
     private void validReferences() {
