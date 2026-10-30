@@ -38,7 +38,7 @@ class EventsSchemaIntegrationTest extends AbstractPostgresIntegrationTest {
     void tabelasEColunasCriadas() {
         assertThat(columns("event")).containsExactlyInAnyOrder("id", "public_id", "city_id", "title", "slug",
                 "description", "category_id", "venue_id", "status", "age_rating", "price_min_cents", "price_max_cents",
-                "is_free", "ticket_url", "image_url", "origin", "created_at", "updated_at", "version", "search_vector");
+                "is_free", "ticket_url", "image_url", "origin", "created_at", "updated_at", "version", "search_vector", "locked_fields");
         assertThat(columns("occurrence")).containsExactlyInAnyOrder("id", "event_id", "starts_at", "ends_at", "status");
     }
 

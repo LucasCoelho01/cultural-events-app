@@ -4,9 +4,13 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -23,7 +27,9 @@ import jakarta.persistence.Version;
 
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Generated;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Evento cultural com suas sessões. Cidade, categoria e local são referenciados só por id.
@@ -32,6 +38,9 @@ import org.hibernate.generator.EventType;
 @Entity
 @Table(name = "event")
 public class Event {
+
+    /** Nome especial em {@code locked_fields} para sessões alteradas à mão (não é coluna de {@code event}). */
+    public static final String LOCKED_OCCURRENCES = "occurrences";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -100,6 +109,11 @@ public class Event {
     @Column(name = "version", nullable = false)
     private int version;
 
+    /** Colunas (e {@link #LOCKED_OCCURRENCES}) alteradas à mão num evento do agente; ele não as sobrescreve. */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "locked_fields", nullable = false, columnDefinition = "text[]")
+    private List<String> lockedFields = new ArrayList<>();
+
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("startsAt ASC")
     @BatchSize(size = 50)
@@ -118,6 +132,12 @@ public class Event {
      * porque o Hibernate faz INSERT antes de DELETE ao trocar a lista.
      */
     public void replaceWith(EventFields fields, List<OccurrenceFields> newOccurrences) {
+        // "Correção manual vence": num evento do agente, o que esta substituição muda passa a ficar travado.
+        // Calculado antes de atribuir, para que um único UPDATE grave os campos e os locks.
+        boolean agent = origin == EventOrigin.AGENT;
+        Set<String> changed = agent ? changedColumns(fields) : Set.of();
+        boolean sessionsChanged = agent && sessionsDiffer(newOccurrences);
+
         this.cityId = fields.cityId();
         this.categoryId = fields.categoryId();
         this.venueId = fields.venueId();
@@ -132,6 +152,67 @@ public class Event {
         this.ticketUrl = fields.ticketUrl();
         this.imageUrl = fields.imageUrl();
         syncOccurrences(newOccurrences);
+        if (sessionsChanged) {
+            changed = new LinkedHashSet<>(changed);
+            changed.add(LOCKED_OCCURRENCES);
+        }
+        lock(changed);
+    }
+
+    /** Nomes das colunas cujo valor muda com {@code fields}, na ordem das colunas. */
+    private Set<String> changedColumns(EventFields fields) {
+        Set<String> changed = new LinkedHashSet<>();
+        mark(changed, "city_id", cityId, fields.cityId());
+        mark(changed, "category_id", categoryId, fields.categoryId());
+        mark(changed, "venue_id", venueId, fields.venueId());
+        mark(changed, "title", title, fields.title());
+        // Slug nulo: o banco regenera a partir do título; só um slug informado e diferente conta como mudança.
+        if (fields.slug() != null) {
+            mark(changed, "slug", slug, fields.slug());
+        }
+        mark(changed, "description", description, fields.description());
+        mark(changed, "status", status, fields.status());
+        mark(changed, "age_rating", ageRating, fields.ageRating());
+        mark(changed, "price_min_cents", priceMinCents, fields.priceMinCents());
+        mark(changed, "price_max_cents", priceMaxCents, fields.priceMaxCents());
+        mark(changed, "is_free", free, fields.free());
+        mark(changed, "ticket_url", ticketUrl, fields.ticketUrl());
+        mark(changed, "image_url", imageUrl, fields.imageUrl());
+        return changed;
+    }
+
+    private static void mark(Set<String> changed, String column, Object current, Object incoming) {
+        if (!Objects.equals(current, incoming)) {
+            changed.add(column);
+        }
+    }
+
+    /** Compara por instante (e não por {@code OffsetDateTime}, que diferencia o deslocamento) início, fim e status. */
+    private boolean sessionsDiffer(List<OccurrenceFields> newOccurrences) {
+        Set<Slot> current = occurrences.stream()
+                .map(o -> new Slot(o.getStartsAt(), o.getEndsAt(), o.getStatus()))
+                .collect(Collectors.toSet());
+        Set<Slot> incoming = newOccurrences.stream()
+                .map(o -> new Slot(o.startsAt(), o.endsAt(), o.status()))
+                .collect(Collectors.toSet());
+        return !current.equals(incoming);
+    }
+
+    private record Slot(java.time.Instant startsAt, java.time.Instant endsAt, OccurrenceStatus status) {
+
+        Slot(OffsetDateTime startsAt, OffsetDateTime endsAt, OccurrenceStatus status) {
+            this(key(startsAt).toInstant(), endsAt == null ? null : key(endsAt).toInstant(), status);
+        }
+    }
+
+    /** União sem duplicatas; troca a lista (e não a altera no lugar) para o Hibernate perceber a mudança. */
+    private void lock(Set<String> names) {
+        if (lockedFields.containsAll(names)) {
+            return;
+        }
+        Set<String> merged = new LinkedHashSet<>(lockedFields);
+        merged.addAll(names);
+        lockedFields = new ArrayList<>(merged);
     }
 
     private void syncOccurrences(List<OccurrenceFields> newOccurrences) {
@@ -236,6 +317,11 @@ public class Event {
 
     public int getVersion() {
         return version;
+    }
+
+    /** Campos travados por correção manual (colunas de {@code event} e {@link #LOCKED_OCCURRENCES}). */
+    public List<String> getLockedFields() {
+        return List.copyOf(lockedFields);
     }
 
     /** Sessões ordenadas por {@code startsAt} (a ordem vem do banco após gravar ou carregar). */
