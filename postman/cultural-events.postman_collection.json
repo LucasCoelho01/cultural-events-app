@@ -52,6 +52,10 @@
     {
       "key": "eventSlug",
       "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
     }
   ],
   "item": [
@@ -928,6 +932,299 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"405\", () => pm.response.to.have.status(405));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Execuções do agente",
+      "item": [
+        {
+          "name": "Listar fontes de ingestão → 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-sources",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-sources"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"inclui a fonte sympla\", () => pm.expect(pm.response.json().map(s => s.code)).to.include(\"sympla\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar execuções → 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"traz items e page\", () => { pm.expect(body.items).to.be.an(\"array\"); pm.expect(body.page.page).to.eql(0); });",
+                  "if (body.items.length > 0) { pm.collectionVariables.set(\"runId\", String(body.items[0].id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar execuções filtradas → 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs?source=sympla&status=FAILED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs"
+              ],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "sympla"
+                },
+                {
+                  "key": "status",
+                  "value": "FAILED"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"só execuções FAILED da sympla\", () => pm.response.json().items.forEach(r => { pm.expect(r.status).to.eql(\"FAILED\"); pm.expect(r.source.code).to.eql(\"sympla\"); }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fonte sem execuções → 200 vazio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs?source=inexistente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs"
+              ],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "inexistente"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"página vazia\", () => pm.expect(pm.response.json().page.totalElements).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalhe da execução → 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs/{{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs",
+                "{{runId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"runId\")) { pm.test.skip(\"sem execução cadastrada\"); } else {",
+                  "  pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "  pm.test(\"traz errors e createdEvents\", () => { pm.expect(pm.response.json().errors).to.be.an(\"array\"); pm.expect(pm.response.json().createdEvents).to.be.an(\"array\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Status inválido → 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs?status=DONE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DONE"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execução inexistente → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs",
+                "999999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Id de execução inválido → 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs",
+                "abc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Despublicar execução inexistente → 404",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/ingestion-runs/999999999/unpublish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "ingestion-runs",
+                "999999999",
+                "unpublish"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404\", () => pm.response.to.have.status(404));"
                 ]
               }
             }

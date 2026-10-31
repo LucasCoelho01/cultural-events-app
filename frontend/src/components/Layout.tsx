@@ -29,6 +29,9 @@ export function Layout() {
           <Link to="/admin/eventos" className="text-sm text-gray-500">
             Admin
           </Link>
+          <Link to="/admin/execucoes" className="text-sm text-gray-500">
+            Execuções do agente
+          </Link>
         </div>
       </header>
       <main className="p-6">

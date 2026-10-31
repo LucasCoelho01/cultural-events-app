@@ -1,6 +1,7 @@
 package com.culturalevents.events.infrastructure;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,17 @@ class EventRepositoryAdapter implements EventRepository {
                 .setParameter("publicId", publicId)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<Event> findAllByPublicIds(Collection<UUID> publicIds) {
+        if (publicIds.isEmpty()) {
+            return List.of();
+        }
+        return entityManager
+                .createQuery("select e from Event e where e.publicId in :publicIds order by e.id", Event.class)
+                .setParameter("publicIds", publicIds)
+                .getResultList();
     }
 
     @Override
