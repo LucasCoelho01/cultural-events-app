@@ -1,5 +1,7 @@
 package com.culturalevents.events.domain;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +14,9 @@ public interface EventRepository {
     Page<Event> search(EventFilter filter, Pageable pageable);
 
     Optional<Event> findByPublicId(UUID publicId);
+
+    /** Eventos pelos ids públicos, ordenados por {@code id}; ids sem evento são ignorados. */
+    List<Event> findAllByPublicIds(Collection<UUID> publicIds);
 
     Optional<Event> findByCityIdAndSlug(long cityId, String slug);
 

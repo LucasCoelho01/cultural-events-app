@@ -68,6 +68,17 @@ class ArchitectureTest {
                             "com.culturalevents.locations.infrastructure..")
                     .allowEmptyShould(true);
 
+    /** ingestion acessa events apenas pelo caso de uso em application (despublicação em lote). */
+    @ArchTest
+    public static final ArchRule INGESTION_SHOULD_NOT_DEPEND_ON_EVENTS_INTERNALS =
+            noClasses()
+                    .that().resideInAPackage("..ingestion..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "com.culturalevents.events.domain..",
+                            "com.culturalevents.events.api..",
+                            "com.culturalevents.events.infrastructure..")
+                    .allowEmptyShould(true);
+
     /** events acessa locations, categories e venues apenas pelos casos de uso da camada application. */
     @ArchTest
     public static final ArchRule EVENTS_SHOULD_NOT_DEPEND_ON_OTHER_MODULES_INTERNALS =

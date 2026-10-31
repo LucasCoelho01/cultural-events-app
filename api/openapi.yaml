@@ -549,8 +549,134 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/EventNotFound"
+  /admin/ingestion-sources:
+    get:
+      tags: [ingestion]
+      operationId: listIngestionSources
+      summary: Lista as fontes de ingestão cadastradas
+      description: Fontes ordenadas por `name`, sem paginação; alimenta o filtro da listagem de execuções.
+      responses:
+        "200":
+          description: Fontes cadastradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceRef"
+  /admin/ingestion-runs:
+    get:
+      tags: [ingestion]
+      operationId: listIngestionRuns
+      summary: Lista as execuções do agente de ingestão de forma paginada
+      description: >-
+        Execuções da mais recente para a mais antiga (`startedAt` e `id` decrescentes). Um `source` sem
+        execuções devolve página vazia.
+      parameters:
+        - name: source
+          in: query
+          required: false
+          description: Code da fonte (por exemplo, `sympla`).
+          schema:
+            type: string
+            maxLength: 60
+            example: sympla
+        - name: status
+          in: query
+          required: false
+          description: Filtra pela situação da execução; sem o parâmetro, todas.
+          schema:
+            $ref: "#/components/schemas/IngestionRunStatus"
+        - name: page
+          in: query
+          required: false
+          description: Número da página (baseado em zero).
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Quantidade de itens por página.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Página de execuções.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionRunPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /admin/ingestion-runs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador da execução.
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags: [ingestion]
+      operationId: getIngestionRun
+      summary: Busca uma execução com seus erros e os eventos que ela criou
+      responses:
+        "200":
+          description: Execução encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionRunDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/IngestionRunNotFound"
+  /admin/ingestion-runs/{id}/unpublish:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador da execução.
+        schema:
+          type: integer
+          format: int64
+    post:
+      tags: [ingestion]
+      operationId: unpublishIngestionRun
+      summary: Despublica em lote os eventos criados pela execução
+      description: >-
+        Muda para `DRAFT` os eventos criados pela execução que estão `PUBLISHED`, com a mesma transição e o mesmo
+        controle de `version` da edição de evento. Nada é excluído. A operação é atômica: se algum evento mudou
+        durante o lote, responde 409 e nenhum é alterado. Execução `RUNNING` também responde 409.
+      responses:
+        "200":
+          description: Eventos despublicados (zero se não havia nenhum publicado).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnpublishResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/IngestionRunNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   responses:
+    IngestionRunNotFound:
+      description: Execução não encontrada.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     BadRequest:
       description: Parâmetro inválido.
       content:
@@ -1202,3 +1328,174 @@ components:
       required:
         - items
         - page
+    IngestionRunStatus:
+      type: string
+      enum: [RUNNING, SUCCESS, PARTIAL, FAILED]
+    SourceRef:
+      type: object
+      description: Fonte de eventos do agente de ingestão.
+      properties:
+        code:
+          type: string
+          example: sympla
+        name:
+          type: string
+          example: Sympla
+      required:
+        - code
+        - name
+    IngestionRunSummary:
+      type: object
+      description: Resumo de uma execução do agente.
+      properties:
+        id:
+          type: integer
+          format: int64
+        source:
+          $ref: "#/components/schemas/SourceRef"
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Nulo enquanto a execução está em andamento.
+        durationSeconds:
+          type: integer
+          format: int64
+          nullable: true
+          description: Duração em segundos; nulo enquanto a execução está em andamento.
+        status:
+          $ref: "#/components/schemas/IngestionRunStatus"
+        created:
+          type: integer
+          format: int32
+        updated:
+          type: integer
+          format: int32
+        unchanged:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+      required:
+        - id
+        - source
+        - startedAt
+        - status
+        - created
+        - updated
+        - unchanged
+        - failed
+    IngestionRunPage:
+      type: object
+      description: Página de execuções.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestionRunSummary"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+      required:
+        - items
+        - page
+    IngestionRunError:
+      type: object
+      description: Erro de um item registrado pelo agente na execução.
+      properties:
+        code:
+          type: string
+          nullable: true
+          description: Código do erro (prefixo `CODIGO:` da mensagem); nulo se a mensagem não tem código.
+          example: EXTRACTION_FAILED
+        externalId:
+          type: string
+          description: Identificador do item na fonte; `-` para erros globais da execução.
+          example: "123"
+        detail:
+          type: string
+          example: sem título
+      required:
+        - externalId
+        - detail
+    IngestionCreatedEvent:
+      type: object
+      description: Evento criado pela execução.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/EventStatus"
+      required:
+        - id
+        - title
+        - status
+    IngestionRunDetail:
+      type: object
+      description: Execução do agente com seus erros e os eventos que ela criou.
+      properties:
+        id:
+          type: integer
+          format: int64
+        source:
+          $ref: "#/components/schemas/SourceRef"
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        durationSeconds:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          $ref: "#/components/schemas/IngestionRunStatus"
+        created:
+          type: integer
+          format: int32
+        updated:
+          type: integer
+          format: int32
+        unchanged:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestionRunError"
+        createdEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestionCreatedEvent"
+      required:
+        - id
+        - source
+        - startedAt
+        - status
+        - created
+        - updated
+        - unchanged
+        - failed
+        - errors
+        - createdEvents
+    UnpublishResult:
+      type: object
+      properties:
+        unpublished:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Quantidade de eventos despublicados.
+      required:
+        - unpublished

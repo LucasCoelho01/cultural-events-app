@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -150,6 +151,24 @@ public class EventsService {
         Long venueInternalId = validate(command, event);
         event.replaceWith(fields(command, venueInternalId), occurrenceFields(command));
         return view(write(() -> events.update(event)));
+    }
+
+    /**
+     * Despublica em lote ({@code PUBLISHED → DRAFT}) os eventos informados que estão publicados, pelo mesmo caminho de
+     * gravação da edição (incrementa {@code version}). Tudo ou nada: se algum evento mudou durante o lote, lança
+     * {@link ConflictException} e a transação desfaz o que já havia sido gravado.
+     *
+     * @return quantos eventos foram despublicados
+     */
+    public int unpublish(Collection<UUID> publicIds) {
+        List<Event> published = events.findAllByPublicIds(publicIds).stream()
+                .filter(event -> event.getStatus() == EventStatus.PUBLISHED)
+                .toList();
+        for (Event event : published) {
+            event.unpublish();
+            write(() -> events.update(event));
+        }
+        return published.size();
     }
 
     public void delete(UUID id) {

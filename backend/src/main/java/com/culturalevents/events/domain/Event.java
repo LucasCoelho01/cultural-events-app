@@ -159,6 +159,20 @@ public class Event {
         lock(changed);
     }
 
+    /**
+     * Transição {@code PUBLISHED → DRAFT}, a mesma do {@link #replaceWith} com outro {@code status}: num evento do
+     * agente, {@code status} passa a ficar travado (correção manual). Sem efeito se o evento não está publicado.
+     */
+    public void unpublish() {
+        if (status != EventStatus.PUBLISHED) {
+            return;
+        }
+        if (origin == EventOrigin.AGENT) {
+            lock(Set.of("status"));
+        }
+        this.status = EventStatus.DRAFT;
+    }
+
     /** Nomes das colunas cujo valor muda com {@code fields}, na ordem das colunas. */
     private Set<String> changedColumns(EventFields fields) {
         Set<String> changed = new LinkedHashSet<>();
