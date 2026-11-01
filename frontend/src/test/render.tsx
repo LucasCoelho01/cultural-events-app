@@ -9,13 +9,17 @@ function LocationProbe() {
   return <output data-testid="location">{pathname + search}</output>;
 }
 
-export function renderApp(path: string) {
+export function renderApp(path: string, state?: unknown) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
+      <MemoryRouter
+        initialEntries={[
+          state === undefined ? path : { pathname: path, state },
+        ]}
+      >
         <App />
         <LocationProbe />
       </MemoryRouter>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { useCity } from '../api/cities';
 import { usePublishedEvent } from '../api/events';
 import { useVenue } from '../api/venues';
@@ -7,12 +7,26 @@ import { formatDateTime, futureOccurrences } from '../format/date';
 import { formatPrice } from '../format/price';
 import { safeHttpUrl } from '../format/url';
 import { ErrorMessage } from './ErrorMessage';
+import { categoryChipClass } from './categoryChip';
+import { EventImage } from './EventImage';
 
 const STATUS_LABEL = {
   SCHEDULED: null,
   CANCELLED: 'Cancelada',
   SOLD_OUT: 'Esgotada',
 } as const;
+
+const block = 'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm';
+
+/** Origin list URL from the link state; only internal paths are accepted. */
+function originOf(state: unknown): string | null {
+  const from = (state as { from?: unknown } | null)?.from;
+  return typeof from === 'string' &&
+    from.startsWith('/') &&
+    !from.startsWith('//')
+    ? from
+    : null;
+}
 
 function Venue({ id, name }: { id: string; name: string }) {
   // The address is a bonus: if it fails to load, only the name is shown.
@@ -21,7 +35,7 @@ function Venue({ id, name }: { id: string; name: string }) {
     .filter(Boolean)
     .join(' – ');
   return (
-    <section>
+    <section className={block}>
       <h2 className="font-semibold">Local</h2>
       <p>{name}</p>
       {address && <p className="text-gray-600">{address}</p>}
@@ -32,6 +46,7 @@ function Venue({ id, name }: { id: string; name: string }) {
 export function EventPage() {
   const { uf, cidade, slug } = useParams();
   const [now] = useState(() => new Date());
+  const location = useLocation();
   const city = useCity(uf, cidade);
   const { data: event, error, isError } = usePublishedEvent(uf, cidade, slug);
 
@@ -42,15 +57,38 @@ export function EventPage() {
   const ticketUrl = safeHttpUrl(event.ticketUrl);
   const sessions = futureOccurrences(event.occurrences, now);
 
+  const back = originOf(location.state) ?? `/${uf}/${cidade}`;
+
   return (
     <article className="space-y-4">
-      <h1 className="text-2xl font-semibold">{event.title}</h1>
-      <p className="text-gray-600">{event.category.name}</p>
-      {event.description && <p>{event.description}</p>}
-      {event.ageRating && <p>Classificação: {event.ageRating}</p>}
-      {price && <p className="font-medium">{price}</p>}
+      <Link
+        to={back}
+        className="inline-block rounded font-medium text-brand-purple-dark underline-offset-2 hover:underline"
+      >
+        ← Voltar para os eventos
+      </Link>
+      <EventImage
+        src={event.imageUrl}
+        title={event.title}
+        className="rounded-2xl shadow-sm"
+      />
+      <div className={block}>
+        <span
+          className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${categoryChipClass(event.category.slug)}`}
+        >
+          {event.category.name}
+        </span>
+        <h1 className="mt-2 text-3xl font-bold">{event.title}</h1>
+        {event.description && <p className="mt-3">{event.description}</p>}
+        {event.ageRating && (
+          <p className="mt-3 text-sm text-gray-700">
+            Classificação: {event.ageRating}
+          </p>
+        )}
+        {price && <p className="mt-3 text-xl font-bold">{price}</p>}
+      </div>
 
-      <section>
+      <section className={block}>
         <h2 className="font-semibold">Sessões</h2>
         {city.isError ? (
           <ErrorMessage error={city.error} />
@@ -64,7 +102,7 @@ export function EventPage() {
               <li key={session.startsAt}>
                 {formatDateTime(session.startsAt, city.data.timezone)}
                 {STATUS_LABEL[session.status] && (
-                  <span className="ml-2 text-sm text-red-700">
+                  <span className="ml-2 text-sm font-medium text-red-700">
                     {STATUS_LABEL[session.status]}
                   </span>
                 )}
@@ -81,7 +119,7 @@ export function EventPage() {
           href={ticketUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block rounded bg-blue-700 px-4 py-2 text-white"
+          className="inline-block rounded-full bg-brand-purple-dark px-6 py-3 font-semibold text-white hover:bg-brand-purple"
         >
           Comprar ingressos
         </a>
