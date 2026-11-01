@@ -10,7 +10,9 @@ export function CityPage() {
   if (!data || !uf || !cidade) return <p aria-busy="true">Carregando…</p>;
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold">Eventos em {data.name}</h1>
+      <h1 className="mb-4 text-3xl font-bold text-brand-purple-dark">
+        Eventos em {data.name}
+      </h1>
       <EventList uf={uf} cidade={cidade} />
     </div>
   );

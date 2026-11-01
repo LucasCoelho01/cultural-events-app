@@ -9,7 +9,9 @@ import { renderApp } from './test/render';
 describe('layout', () => {
   it('shows the app name and the default city in the header', async () => {
     renderApp('/zz/cidade-teste');
-    expect(screen.getByText('Cultural Events')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Cultural Events' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Cidade Teste - ZZ')).toBeInTheDocument();
   });
 
@@ -29,7 +31,9 @@ describe('layout', () => {
     expect(
       await screen.findByRole('heading', { name: 'Página não encontrada' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Cultural Events')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Cultural Events' }),
+    ).toBeInTheDocument();
   });
 });
 

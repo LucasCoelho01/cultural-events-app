@@ -137,7 +137,7 @@ export function EventList({ uf, cidade }: { uf: string; cidade: string }) {
               <p>Nenhum evento encontrado.</p>
             )
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((event) => (
                 <EventCard
                   key={event.id}
